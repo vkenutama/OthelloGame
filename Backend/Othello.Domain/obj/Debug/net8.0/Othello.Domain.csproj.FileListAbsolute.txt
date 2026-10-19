@@ -1,0 +1,12 @@
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\bin\Debug\net8.0\Othello.Domain.deps.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\bin\Debug\net8.0\Othello.Domain.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\bin\Debug\net8.0\Othello.Domain.pdb
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\obj\Debug\net8.0\Othello.Domain.GeneratedMSBuildEditorConfig.editorconfig
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\obj\Debug\net8.0\Othello.Domain.AssemblyInfoInputs.cache
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\obj\Debug\net8.0\Othello.Domain.AssemblyInfo.cs
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\obj\Debug\net8.0\Othello.Domain.csproj.CoreCompileInputs.cache
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\obj\Debug\net8.0\Othello.Domain.sourcelink.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\obj\Debug\net8.0\Othello.Domain.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\obj\Debug\net8.0\refint\Othello.Domain.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\obj\Debug\net8.0\Othello.Domain.pdb
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Domain\obj\Debug\net8.0\ref\Othello.Domain.dll

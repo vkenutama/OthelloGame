@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Othello.Domain", "Othello.Domain\Othello.Domain.csproj", "{6A2E7215-C4B4-4B45-B9CA-E66F3D9313D7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Othello.ConsoleApp", "Othello.ConsoleApp\Othello.ConsoleApp.csproj", "{6583D19D-73EB-4D7B-9546-077CAC6FA553}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6A2E7215-C4B4-4B45-B9CA-E66F3D9313D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6A2E7215-C4B4-4B45-B9CA-E66F3D9313D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6A2E7215-C4B4-4B45-B9CA-E66F3D9313D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6A2E7215-C4B4-4B45-B9CA-E66F3D9313D7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6583D19D-73EB-4D7B-9546-077CAC6FA553}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6583D19D-73EB-4D7B-9546-077CAC6FA553}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6583D19D-73EB-4D7B-9546-077CAC6FA553}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6583D19D-73EB-4D7B-9546-077CAC6FA553}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
