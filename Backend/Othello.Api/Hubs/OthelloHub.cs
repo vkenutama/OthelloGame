@@ -3,10 +3,11 @@ using Microsoft.AspNetCore.SignalR;
 using Othello.Api.Dtos;
 using Othello.Api.Services;
 using Othello.Domain;
+using static Othello.Api.Utils.Utility;
 
 namespace Othello.Api.Hubs;
 
-public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService) : Hub<IGameClient>, IOthelloHubService
+public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService) : Hub<IGameClient>, IOthelloHubService, IOthelloGameplayService
 {
     private readonly ConcurrentDictionary<int, Lobby> _lobbies = gameService;
 
@@ -28,7 +29,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService) : Hub<IGam
 
     public async Task CreateLobby(CreateLobbyDto dto)
     {
-        bool playerAlreadyCreateLobby = _lobbies.Values.Any(l => string.Equals(l.CreatedBy.Name, dto.Player.Name, StringComparison.OrdinalIgnoreCase));
+        bool playerAlreadyCreateLobby = _lobbies.Values.Any(l => CheckPlayerUsernameEquality(l.CreatedBy.Name, dto.Player.Name));
         if (playerAlreadyCreateLobby)
         {
             await Clients.Caller.ErrorMessage("Cannot create lobby when the player is already on the lobby.");
@@ -110,7 +111,8 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService) : Hub<IGam
         }
 
         // Check if player is host
-        if (!string.Equals(lobby.CreatedBy.Name, dto.PlayerUsername, StringComparison.OrdinalIgnoreCase))
+        
+        if (!CheckPlayerUsernameEquality(lobby.CreatedBy.Name, dto.PlayerUsername))
         {
             await Clients.Caller.ErrorMessage("Only the lobby creator can delete this lobby");
             return;
@@ -156,7 +158,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService) : Hub<IGam
             return;
         }
 
-        bool playerAlreadyExist = lobby.Players.Any(p => string.Equals(p.Name, dto.Player.Name, StringComparison.OrdinalIgnoreCase));
+        bool playerAlreadyExist = lobby.Players.Any(p => CheckPlayerUsernameEquality(p.Name, dto.Player.Name));
         if (playerAlreadyExist)
         {
             await Clients.Caller.ErrorMessage("Player already joined this lobby");
@@ -192,6 +194,110 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService) : Hub<IGam
     }
     #endregion
     #region Game
-    
+    public async Task MakeMove(MakeMoveDto dto)
+    {
+        // Check also the connection id
+        if (!PlayersConnections.TryGetValue(dto.PlayerUsername, out var connId) || connId != Context.ConnectionId)
+        {
+            await Clients.Caller.ErrorMessage("Unauthorized: You cannot move for another player.");
+            return;
+        }
+        
+        // Check if lobby exist
+        if (!_lobbies.TryGetValue(dto.LobbyId, out var lobby))
+        {
+            await Clients.Caller.ErrorMessage("Lobby not found");
+            return;
+        }
+        
+        // Check if player is valid to this lobby
+        if (!lobby.Players.Any(p => CheckPlayerUsernameEquality(p.Name, dto.PlayerUsername)))
+        {
+            await Clients.Caller.ErrorMessage($"Player {dto.PlayerUsername} is not belong to this lobby");
+            return;
+        }
+        
+        // Get the game 
+        GameManager? game = lobby.Game;
+        if (game == null)
+        {
+            await Clients.Caller.ErrorMessage("Game is not started yet, or the lobby is not started yet");
+            return;
+        }
+        
+        // Check if this player is current turn
+        var activePlayer = game.GetPlayer(game.CurrentTurn);
+        if (!CheckPlayerUsernameEquality(dto.PlayerUsername, activePlayer.Name))
+        {
+            await Clients.Caller.ErrorMessage($"This is not your turn. Waiting for {activePlayer.Name} ({game.CurrentTurn}).");
+            return;
+        }
+        
+        // Try play
+        MoveResult result = game.TryPlayMove(new Position
+        {
+            Row = dto.Row,
+            Col = dto.Col
+        });
+
+        if (!result.IsSuccess)
+        {
+            await Clients.Caller.ErrorMessage($"Invalid move: {result.Failure}");
+            return;
+        }
+        
+        
+        
+        
+    }
+    public async Task StartGame(StartGameDto dto)
+    {
+        // Guard impersonate other player
+        if (PlayersConnections.TryGetValue(dto.PlayerUsername, out var connId) && connId != Context.ConnectionId)
+        {
+            await Clients.Caller.ErrorMessage("You cannot start a game");
+            return;
+        }
+
+        if (!_lobbies.TryGetValue(dto.LobbyId, out var lobby))
+        {
+            await Clients.Caller.ErrorMessage("Lobby not found");
+            return;
+        }
+        
+        // Check if the player is host
+        if(!CheckPlayerUsernameEquality(lobby.CreatedBy.Name, dto.PlayerUsername))
+        {
+            await Clients.Caller.ErrorMessage("You're not allowed to start a game");
+            return;
+        }
+
+        // Lobby is not meet minimum-maximum players of 2
+        if (!lobby.IsFull())
+        {
+            await Clients.Caller.ErrorMessage("Lobby need 2 players to start a game");
+            return;
+        }
+        
+        // Already start
+        if (lobby.Game != null && !lobby.Game.IsGameOver())
+        {
+            await Clients.Caller.ErrorMessage("Game is already in progress.");
+            return;
+        }
+
+        var game = lobby.StartGame();
+        var blackPlayer = game.GetPlayer(PieceColor.Black);
+        var whitePlayer = game.GetPlayer(PieceColor.White);
+
+        var groupId = GetGroupId(lobby.Id);
+        
+        await Clients.Group(groupId!).ReceiveBroadcast(
+            $"Game started! {blackPlayer.Name} is Black (B), {whitePlayer.Name} is White (W). Black moves first!"
+        );
+    }
+
     #endregion
+
+    
 }

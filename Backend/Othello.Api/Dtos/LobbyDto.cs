@@ -27,3 +27,9 @@ public record JoinLobbyDto
     public int LobbyId { get; set; }
     public HumanPlayer Player { get; set; } = null!;
 }
+
+public record StartGameDto
+{
+    public int LobbyId { get; set; }
+    public string PlayerUsername { get; set; } = null!;
+}

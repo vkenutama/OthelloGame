@@ -23,3 +23,11 @@ public record MoveResultDto
     public required int FlippedCount {get; init; }
     
 }
+
+public record MakeMoveDto
+{
+    public int LobbyId { get; init; }
+    public string PlayerUsername { get; init; } = string.Empty;
+    public int Row { get; init; }
+    public int Col { get; init; }
+}
