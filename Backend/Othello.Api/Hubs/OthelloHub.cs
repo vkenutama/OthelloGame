@@ -15,6 +15,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService) : Hub<IGam
     private int LobbyCount() => _lobbies.Count;
     private static int _lobbyId = 0;
 
+    #region Lobby
     private string? GetGroupId(int lobbyId)
     {
         if (!_lobbies.TryGetValue(lobbyId, out var lobby))
@@ -27,6 +28,13 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService) : Hub<IGam
 
     public async Task CreateLobby(CreateLobbyDto dto)
     {
+        bool playerAlreadyCreateLobby = _lobbies.Values.Any(l => string.Equals(l.CreatedBy.Name, dto.Player.Name, StringComparison.OrdinalIgnoreCase));
+        if (playerAlreadyCreateLobby)
+        {
+            await Clients.Caller.ErrorMessage("Cannot create lobby when the player is already on the lobby.");
+            return;
+        }
+        
         if (dto.Player == null || string.IsNullOrWhiteSpace(dto.Player.Name))
         {
             await Clients.Caller.ErrorMessage("Invalid player information");
@@ -182,4 +190,8 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService) : Hub<IGam
 
         await Clients.Group(groupId).ReceiveBroadcast(message);
     }
+    #endregion
+    #region Game
+    
+    #endregion
 }
