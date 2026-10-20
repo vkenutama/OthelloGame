@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Othello.Api.Hubs;
 using Othello.Api.Services;
 
@@ -23,7 +24,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddSingleton<Lobby>();
+builder.Services.AddSingleton<ConcurrentDictionary<int, Lobby>>();
 
 var app = builder.Build();
 

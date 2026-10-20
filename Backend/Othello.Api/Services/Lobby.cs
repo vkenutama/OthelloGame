@@ -18,8 +18,8 @@ public class Lobby
     public DateTime CreatedAt { get; private set; }
 
     public GameManager? Game { get; private set; }
-    public Action<IPlayer?> OnPlayerJoined;
-    public Action<IPlayer?> OnPlayerLeft;
+    public Action<IPlayer?>? OnPlayerJoined;
+    public Action<IPlayer?>? OnPlayerLeft;
 
     public Lobby(int id, IPlayer player, string name, bool isPublic)
     {
@@ -41,6 +41,7 @@ public class Lobby
         }
 
         _players.Add(player);
+        OnPlayerJoined?.Invoke(player);
         return true;
     }
 
@@ -52,6 +53,7 @@ public class Lobby
         }
 
         _players.Remove(player);
+        OnPlayerLeft?.Invoke(player);
         return true;
     }
 
@@ -64,8 +66,9 @@ public class Lobby
         }
         
         GameManager game = new GameManager(_players[0], _players[1]);
+        game.Start();
+        
         Game = game;
-
         return game;
     }
 

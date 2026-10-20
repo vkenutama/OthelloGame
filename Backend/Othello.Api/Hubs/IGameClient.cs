@@ -9,4 +9,6 @@ public interface IGameClient
     Task TurnSkipped(string skippedColor);
     Task GameOver(string result, int blackScore, int whiteScore);
     Task ErrorMessage(string message);
+    Task ReceiveBroadcast(string message);
+    Task LobbyDeleted(string message);
 }
