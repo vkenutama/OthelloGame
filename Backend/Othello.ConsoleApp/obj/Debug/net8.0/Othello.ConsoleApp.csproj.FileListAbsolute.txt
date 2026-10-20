@@ -17,3 +17,5 @@ E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.ConsoleA
 E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.ConsoleApp\obj\Debug\net8.0\Othello.ConsoleApp.pdb
 E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.ConsoleApp\obj\Debug\net8.0\Othello.ConsoleApp.genruntimeconfig.cache
 E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.ConsoleApp\obj\Debug\net8.0\ref\Othello.ConsoleApp.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.ConsoleApp\bin\Debug\net8.0\Spectre.Console.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.ConsoleApp\bin\Debug\net8.0\Spectre.Console.Ansi.dll

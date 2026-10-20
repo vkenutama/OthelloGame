@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Security.Cryptography;
@@ -15,7 +15,7 @@ public class GameManager
     private readonly IPlayer _whitePlayer;
     private bool _isStarted;
     private bool _isProcessing = false;
-    
+
 
     /// <summary>
     /// Game starting event
@@ -59,7 +59,7 @@ public class GameManager
         // Randomize player, who is color
         // 0 = player 1 white, 1 = player 1 black
         var rng = new Random();
-        int rngResult = rng.Next(0, 1);
+        int rngResult = rng.Next(0, 2);
 
         if (rngResult == 0)
         {
@@ -71,6 +71,9 @@ public class GameManager
             _whitePlayer = player2;
             _blackPlayer = player1;
         }
+
+        _whitePlayer.Color = PieceColor.White;
+        _blackPlayer.Color = PieceColor.Black;
     }
 
     public bool IsGameOver()
@@ -93,7 +96,7 @@ public class GameManager
             {
                 Failure = MoveFailureReason.AlreadyStarted,
                 Moves = null!,
-                ISuccess = false
+                IsSuccess = false
             };
         }
 
@@ -108,7 +111,7 @@ public class GameManager
         {
             Failure = MoveFailureReason.None,
             Moves = null!,
-            ISuccess = true
+            IsSuccess = true
         };
     }
 
@@ -125,7 +128,7 @@ public class GameManager
             return new MoveResult()
             {
                 Failure = MoveFailureReason.NotStarted,
-                ISuccess = false,
+                IsSuccess = false,
                 Moves = null!,
             };
         }
@@ -135,7 +138,7 @@ public class GameManager
             return new MoveResult()
             {
                 Failure = MoveFailureReason.GameOver,
-                ISuccess = false,
+                IsSuccess = false,
                 Moves = null!,
             };
         }
@@ -145,7 +148,7 @@ public class GameManager
             return new MoveResult()
             {
                 Failure = MoveFailureReason.ReentrantCall,
-                ISuccess = false,
+                IsSuccess = false,
                 Moves = null!,
             };
         }
@@ -157,7 +160,7 @@ public class GameManager
             {
                 Failure = MoveFailureReason.OutOfBounds,
                 Moves = null!,
-                ISuccess = false
+                IsSuccess = false
             };
         }
 
@@ -169,7 +172,7 @@ public class GameManager
             {
                 Failure = MoveFailureReason.CellOccupied,
                 Moves = null!,
-                ISuccess = false
+                IsSuccess = false
             };
         }
 
@@ -180,7 +183,7 @@ public class GameManager
             {
                 Failure = MoveFailureReason.NoPiecesFlipped,
                 Moves = null!,
-                ISuccess = false
+                IsSuccess = false
             };
         }
 
@@ -189,24 +192,28 @@ public class GameManager
         _isProcessing = true;
 
         var move = ApplyMove(position, CurrentTurn);
+        MovePlayed?.Invoke(move);
+        ScoreChanged?.Invoke(GetScore());
 
-        MovePlayed?.Invoke(playerMove);
+        List<Move> moves = new List<Move>();
+        moves.Add(move);
 
         // Advance to next player
         AdvanceTurn();
+        _isProcessing = false;
 
         return new MoveResult
         {
             Failure = MoveFailureReason.None,
-            Moves = validMoves,
-            ISuccess = true
+            Moves = moves,
+            IsSuccess = true
         };
     }
 
     public IReadOnlyList<Position>? GetValidMoves()
     {
         var validMovePositions = FindValidMoves(CurrentTurn).Select(m => m.Target).ToList();
-        
+
         return validMovePositions;
     }
 
@@ -268,7 +275,7 @@ public class GameManager
                 Col = col
             });
 
-            cell.Piece ??= pieces[i];
+            cell!.Piece ??= pieces[i];
         }
     }
 
@@ -283,19 +290,26 @@ public class GameManager
     /// <param name="color"></param>
     private Move ApplyMove(Position position, PieceColor color)
     {
-        var cell = Board.Cells[position.Row, position.Col];
-        cell.Piece ??= new Piece
+        var flipped = GetFlips(position, color) ?? new List<Position>();
+
+        var targetCell = Board.Cells[position.Row, position.Col];
+        targetCell.Piece = new Piece { Color = color };
+
+        // Place the piece on the board
+        foreach (var flipPos in flipped)
         {
-            Color = color
-        };
-        
-        var flipped = findvalid
+            var cellToFlip = Board.Cells[flipPos.Row, flipPos.Col];
+            if (cellToFlip.Piece != null)
+            {
+                cellToFlip.Piece.Color = color;
+            }
+        }
 
         return new Move
         {
             Target = position,
             Color = color,
-            Flipped = null
+            Flipped = flipped
         };
     }
 
@@ -309,9 +323,8 @@ public class GameManager
             CurrentTurn = opponent;
             TurnChanged?.Invoke(opponent);
         }
-
-        // Opponent doesn't have valid move, current player still have
-        if (HasValidMove(CurrentTurn))
+        // Opponent doesn't have valid move, current player still has valid moves
+        else if (HasValidMove(CurrentTurn))
         {
             TurnSkipped?.Invoke(opponent);
             TurnChanged?.Invoke(CurrentTurn);
@@ -320,13 +333,13 @@ public class GameManager
         // Both doesn't have valid move
         TryGetResult(out var result);
         Result = result;
-        
+
         if (result != null)
         {
             GameOver?.Invoke(result.Value);
         }
     }
-    
+
     private readonly IReadOnlyList<Direction> _directions = new List<Direction>()
     {
         new Direction
@@ -377,115 +390,83 @@ public class GameManager
 
     private List<Move> FindValidMoves(PieceColor color)
     {
-        PieceColor opponentColor = color == PieceColor.Black ? PieceColor.White : PieceColor.Black;
-
-        
-
-
         List<Move> validMoves = new List<Move>();
 
-        // Loop through all the cell
         foreach (var cell in Board.Cells)
         {
-            int row = cell.Position.Row;
-            int col = cell.Position.Col;
-
-            // Loop through all the direction in this cell
-            foreach (var dir in _directions)
+            // Must be an empty cell
+            if (cell.Piece != null)
             {
-                // Check 1 : Immediate neighbor (Distance 1)
-                int currRow = row + dir.DRow;
-                int currCol = col + dir.DColumn;
+                continue;
+            }
 
-                Position offsettedPosition = new Position
+            var flips = GetFlips(cell.Position, color);
+            if (flips != null && flips.Count > 0)
+            {
+                validMoves.Add(new Move
                 {
-                    Row = currRow,
-                    Col = currCol
-                };
+                    Target = cell.Position,
+                    Color = color,
+                    Flipped = flips
+                });
+            }
+        }
 
-                ICell? offsettedCell = GetCell(offsettedPosition);
+        return validMoves;
+    }
 
-                // Off the board -> to next dir
-                if (offsettedCell == null)
+    private List<Position>? GetFlips(Position position, PieceColor color)
+    {
+        // A piece can only be placed on an empty cell inside the board
+        var targetCell = GetCell(position);
+        if (targetCell == null || targetCell.Piece != null)
+        {
+            return null;
+        }
+
+        PieceColor opponentColor = (color == PieceColor.Black) ? PieceColor.White : PieceColor.Black;
+        List<Position> totalFlips = new List<Position>();
+
+        foreach (var dir in _directions)
+        {
+            List<Position> potentialFlips = new List<Position>();
+            int currRow = position.Row + dir.DRow;
+            int currCol = position.Col + dir.DColumn;
+
+            while (true)
+            {
+                var nextPos = new Position { Row = currRow, Col = currCol };
+                var cell = GetCell(nextPos);
+
+                // Out of bounds or cell is empty -> chain broken in this direction
+                if (cell == null || cell.Piece == null)
                 {
+                    break;
+                }
+
+                // Opponent's piece -> candidate to flip, keep advancing
+                if (cell.Piece.Color == opponentColor)
+                {
+                    potentialFlips.Add(nextPos);
+                    currRow += dir.DRow;
+                    currCol += dir.DColumn;
                     continue;
                 }
 
-                // The cell does not contain piece -> to next dir
-                if (offsettedCell.Piece == null)
+                // Found player's own piece -> bracket closed!
+                if (cell.Piece.Color == color)
                 {
-                    continue;
-                }
-
-                // This cell contain current player color
-                if (offsettedCell.Piece.Color == color)
-                {
-                    continue;
-                }
-
-                // Check 2 : The Line March 
-                if (offsettedCell.Piece.Color == opponentColor)
-                {
-                    while (true)
+                    if (potentialFlips.Count > 0)
                     {
-                        currRow += dir.DRow;
-                        currCol += dir.DColumn;
-
-                        offsettedPosition = new Position()
-                        {
-                            Row = currRow,
-                            Col = currCol
-                        };
-
-                        offsettedCell = GetCell(offsettedPosition);
-
-                        // Out of board
-                        if (offsettedCell == null)
-                        {
-                            break;
-                        }
-
-                        // Empty cell
-                        if (offsettedCell.Piece == null)
-                        {
-                            break;
-                        }
-
-                        // Target cell is opponent color
-                        if (offsettedCell.Piece.Color == opponentColor)
-                        {
-                            continue;
-                        }
-
-                        // This cell is source position
-                        if (offsettedCell.Piece.Color == color)
-                        {
-                            Position target = new Position()
-                            {
-                                Row = row,
-                                Col = col
-                            };
-
-                            validMoves.Add(new Move
-                            {
-                                Target = target,
-                                Color = color,
-                                Flipped = GetFlips(target, color)
-                            });
-                            break;
-                        }
+                        totalFlips.AddRange(potentialFlips);
                     }
+
+                    break;
                 }
             }
         }
 
-
-        return validMoves;
-    }
-    
-    private List<Position>? GetFlips(Position position, PieceColor color)
-    {
-        // Get the 
+        return totalFlips.Count > 0 ? totalFlips : null;
     }
 
     /// <summary>
