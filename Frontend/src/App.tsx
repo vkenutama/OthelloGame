@@ -1,121 +1,59 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useOthelloSignalR } from "./services/signal_r"
+import { CreateLobbyDto } from "./types/othello";
+import { GetLobbyDetailsDto } from "./dtos/lobby_dto"
+import { useState } from "react";
+
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { isConnected, gameState, messages, error } = useOthelloSignalR();
+  const { createLobby } = useOthelloSignalR();
+  const [lobbies, setLobbies] = useState<GetLobbyDetailsDto[] | null>(null);
+
+  async function handleClick() {
+    const dto: CreateLobbyDto = {
+      name: "My lobby",
+      player: {
+        name: "Joko"
+      },
+      isPublic: true
+    }
+    await createLobby(dto.name, dto.isPublic, dto.player.name)
+  }
+
+  async function getLobbies() {
+    const url = "http://localhost:5057/api/lobby"
+
+    try {
+      const response = await fetch(url);
+      const data: GetLobbyDetailsDto[] = await response.json();
+
+      console.log("Lobbies: ", data)
+      setLobbies(data)
+    }
+    catch (error: any) {
+      console.error("Fetch error:", error.messages)
+    }
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <div className="flex flex-col">
+      <h1>Othello Game</h1>
+      <p>Status: {isConnected ? "🟢 Connected to Hub" : "🔴 Disconnected"}</p>
+      <div className="flex flex-row">
+        <button className="w-200 h-400px bg-amber-100" onClick={handleClick}>CreateLobby</button>
+        <button className="w-200 h-400px bg-green-200" onClick={getLobbies}>Get all Lobby</button>
+      </div>
+      <p className="font-bold">Lobbies:</p>
+      <ul className="list-disc pl-5">
+        {lobbies && lobbies.length === 0 && <p className="text-gray-500">No active lobbies found.</p>}
+        {lobbies?.map((value) => (
+          <li key={value.name}>
+            {value.name} (Created by: {value.createdBy} - {value.playersCount}/{value.maxPlayers})
+          </li>
+        ))}
+      </ul>
+      {error && <p style={{ color: "red" }}>Error: {error}</p>}
+    </div>
   )
 }
 
