@@ -24,12 +24,31 @@ export function useOthelloSignalR() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        let isMounted = true;
+        let retryTimer;
+
         // Build connection
         const newConnection = new signalR.HubConnectionBuilder()
             .withUrl(HUB_URL!)
             .withAutomaticReconnect()
             .configureLogging(signalR.LogLevel.Information)
             .build()
+
+        // Attach lifecycle listeners to sync isConnected State
+        newConnection.onreconnecting(() => {
+            if (isMounted) setIsConnected(false);
+        })
+
+        newConnection.onreconnected(() => {
+            if (isMounted) {
+                setIsConnected(true);
+                setError(null);
+            }
+        })
+
+        newConnection.onclose(() => {
+            if (isMounted) setIsConnected(false);
+        })
 
         // Register server event listener
         newConnection.on("ReceiveGameState", (state: GameStateDto) => {
@@ -57,6 +76,37 @@ export function useOthelloSignalR() {
             setError(error)
         })
 
+        const connect = async () => {
+            if (newConnection.state === signalR.HubConnectionState.Disconnected) {
+                try {
+                    await newConnection.start();
+
+                    if (isMounted) {
+                        console.log("Connected to SignalR Hub")
+                        setIsConnected(true);
+                        setError(null);
+                    }
+                } catch (err) {
+                    if (isMounted) {
+                        setIsConnected(false)
+                        console.warn("Connection attempt failed, will retry in 5s")
+                    }
+                }
+
+            }
+        }
+
+        connect();
+
+        retryTimer = setInterval(() => {
+            if (newConnection.state == signalR.HubConnectionState.Disconnected) {
+                console.log("Reconnecting to Hub...")
+                connect();
+            }
+        }, 5000);
+
+
+
         // Start connection
         newConnection
             .start()
@@ -68,12 +118,16 @@ export function useOthelloSignalR() {
                 console.error("SignalR Connection Error: ", err)
             })
 
-            setConnection(newConnection)
+        setConnection(newConnection)
 
         return () => {
-            newConnection.stop();
-        }
-    }, [])
+            isMounted = false;
+            if (retryTimer) clearInterval(retryTimer); // Stop timer
+            if (newConnection.state === signalR.HubConnectionState.Connected) {
+                newConnection.stop();
+            }
+        };
+    }, []);
 
     const createLobby = async (lobbyName: string, isPublic: boolean, playerName: string) => {
         if (!connection) return;
@@ -107,7 +161,7 @@ export function useOthelloSignalR() {
         };
         await connection.invoke("StartGame", dto);
     };
-    
+
     // 4. Play a move
     const makeMove = async (lobbyId: number, playerName: string, row: number, col: number) => {
         if (!connection) return;
@@ -120,7 +174,7 @@ export function useOthelloSignalR() {
         await connection.invoke("MakeMove", dto);
     };
 
-    return{
+    return {
         isConnected,
         gameState,
         lastMove,
