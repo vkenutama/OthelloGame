@@ -1,60 +1,95 @@
 import { useOthelloSignalR } from "./services/signal_r"
-import { CreateLobbyDto } from "./types/othello";
 import { GetLobbyDetailsDto } from "./dtos/lobby_dto"
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Navbar } from "./components/Navbar";
+import { DisconnectedModal } from "./components/DisconnectedModal";
+import { ModeSelection } from "./components/ModeSelection";
+import { LobbyBrowser } from "./components/lobby/LobbyBrowser";
+import { getLobby } from "./services/api"
 
+type ViewMode = "menu" | "ai" | "online" | "in_game"
 
 function App() {
-  const { isConnected, gameState, messages, error } = useOthelloSignalR();
-  const { createLobby } = useOthelloSignalR();
+  const { isConnected, gameState, messages, error, createLobby } = useOthelloSignalR();
   const [lobbies, setLobbies] = useState<GetLobbyDetailsDto[] | null>(null);
+  const [playerName, setPlayerName] = useState<string>(() => {
+    return localStorage.getItem("othello_player_name") || "Guest"
+  });
 
-  async function handleClick() {
-    const dto: CreateLobbyDto = {
-      name: "My lobby",
-      player: {
-        name: "Joko"
-      },
-      isPublic: true
-    }
-    await createLobby(dto.name, dto.isPublic, dto.player.name)
-  }
+  const [viewMode, setViewMode] = useState<ViewMode>("menu");
 
-  async function getLobbies() {
-    const url = "http://localhost:5057/api/lobby"
 
-    try {
-      const response = await fetch(url);
-      const data: GetLobbyDetailsDto[] = await response.json();
-
-      console.log("Lobbies: ", data)
-      setLobbies(data)
-    }
-    catch (error: any) {
-      console.error("Fetch error:", error.messages)
+  const handleNameChange = (newName: string) => {
+    const trimmed = newName.trim();
+    if (trimmed) {
+      setPlayerName(trimmed)
+      localStorage.setItem("othello_player_name", trimmed)
     }
   }
+
+  useEffect(() => {
+    getLobby().then((data) => {
+      if (data) setLobbies(data);
+    })
+  }, [])
+
 
   return (
-    <div className="flex flex-col">
-      <h1>Othello Game</h1>
-      <p>Status: {isConnected ? "🟢 Connected to Hub" : "🔴 Disconnected"}</p>
-      <div className="flex flex-row">
-        <button className="w-200 h-400px bg-amber-100" onClick={handleClick}>CreateLobby</button>
-        <button className="w-200 h-400px bg-green-200" onClick={getLobbies}>Get all Lobby</button>
-      </div>
-      <p className="font-bold">Lobbies:</p>
-      <ul className="list-disc pl-5">
-        {lobbies && lobbies.length === 0 && <p className="text-gray-500">No active lobbies found.</p>}
-        {lobbies?.map((value) => (
-          <li key={value.name}>
-            {value.name} (Created by: {value.createdBy} - {value.playersCount}/{value.maxPlayers})
-          </li>
-        ))}
-      </ul>
-      {error && <p style={{ color: "red" }}>Error: {error}</p>}
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+
+      <DisconnectedModal isConnected={isConnected} />
+
+      {/* Navbar */}
+      <Navbar
+        isConnected={isConnected}
+        playerName={playerName}
+        onPlayerNameChange={handleNameChange}
+      />
+
+      <main>
+        {viewMode === "menu" && (
+          <ModeSelection onSelectMode={(mode) => setViewMode(mode)} />
+        )}
+
+        {/* 2. Play Online Lobby Screen */}
+        {viewMode === "online" && (
+          <div className="mx-auto max-w-7xl p-6">
+            <button
+              onClick={() => setViewMode("menu")}
+              className="mb-6 flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              ← Back to Main Menu
+            </button>
+            {/* (Your Lobby Creator & Active Lobbies will be placed here) */}
+            <LobbyBrowser lobbies={lobbies} />
+          </div>
+        )}
+
+        {/* 3. AI Setup Screen */}
+        {viewMode === "ai" && (
+          <div className="mx-auto max-w-7xl p-6">
+            <button
+              onClick={() => setViewMode("menu")}
+              className="mb-6 flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              ← Back to Main Menu
+            </button>
+            <h2 className="text-xl font-bold">AI Match Setup</h2>
+          </div>
+        )}
+      </main>
+
+      {/* <button
+        className="bg-amber-100 text-black p-2 rounded-xl text-sm"
+        onClick={() => {
+          createLobby(`${playerName}'s Lobby`, true, playerName)
+        }}>
+        Click me
+      </button> */}
+
+      {/* Main Content */}
     </div>
-  )
+  );
 }
 
 export default App

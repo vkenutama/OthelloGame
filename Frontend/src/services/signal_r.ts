@@ -103,20 +103,8 @@ export function useOthelloSignalR() {
                 console.log("Reconnecting to Hub...")
                 connect();
             }
-        }, 5000);
+        }, 3000);
 
-
-
-        // Start connection
-        newConnection
-            .start()
-            .then(() => {
-                console.log("Connected to SignalR Hub")
-                setIsConnected(true);
-            })
-            .catch((err) => {
-                console.error("SignalR Connection Error: ", err)
-            })
 
         setConnection(newConnection)
 

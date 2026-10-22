@@ -33,3 +33,12 @@ public record StartGameDto
     public int LobbyId { get; set; }
     public string PlayerUsername { get; set; } = null!;
 }
+
+public record GetLobbyDetailsDto
+{
+    public int Id { get; init; }
+    public string Name { get; set; } = string.Empty;
+    public string CreatedBy { get; set; } = string.Empty;
+    public int PlayersCount { get; set; }
+    public int MaxPlayers { get; private set; } = 2;
+}
