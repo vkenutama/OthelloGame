@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using Othello.Api.Dtos;
 using Othello.Api.Services;
 
@@ -12,13 +12,33 @@ public static class LobbyEndpoints
 
         group.MapGet("", (ConcurrentDictionary<int, Lobby> lobbies) =>
         {
-            var result = lobbies.Values.Select(l => new GetLobbyDetailsDto
+            var result = lobbies.Values.Where(l => l.IsPublic).Select(l => new GetLobbyDetailsDto
             {
                 Id = l.Id,
                 Name = l.Name,
                 CreatedBy = l.CreatedBy.Name,
                 PlayersCount = l.Players.Count,
             }).ToList();
+
+            return Results.Ok(result);
+        });
+
+        group.MapGet("{id:int}", (int id, ConcurrentDictionary<int, Lobby> lobbies) =>
+        {
+            if (!lobbies.TryGetValue(id, out var lobby))
+            {
+                return Results.NotFound();
+            }
+
+            var result = new
+            {
+                Id = lobby.Id,
+                Name = lobby.Name,
+                CreatedBy = lobby.CreatedBy.Name,
+                IsPublic = lobby.IsPublic,
+                PlayersCount = lobby.Players.Count,
+                Players = lobby.Players.Select(p => p.Name).ToList()
+            };
 
             return Results.Ok(result);
         });

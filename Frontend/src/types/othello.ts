@@ -37,6 +37,7 @@ export interface CreateLobbyDto {
   player: HumanPlayerDto;
   name: string;
   isPublic: boolean;
+  isAiGame: boolean;
 }
 
 export interface JoinLobbyDto {
@@ -54,4 +55,18 @@ export interface MakeMoveDto {
   playerUsername: string;
   row: number;
   col: number;
+}
+
+export interface LeaveLobbyDto {
+  lobbyId: number;
+  playerUsername: string;
+}
+
+export interface ActiveLobbyInfo {
+  id: number;
+  name: string;
+  createdBy: string;
+  isPublic?: boolean;
+  playersCount: number;
+  guestName?: string | null;
 }

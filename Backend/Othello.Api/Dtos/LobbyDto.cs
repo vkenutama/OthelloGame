@@ -8,6 +8,7 @@ public record CreateLobbyDto
     public string Name { get; init; } = string.Empty;
     public bool IsPublic { get; init; } = false;
     public HumanPlayer Player { get; init; } = null!;
+    public bool IsAiGame { get; init; } = false;
 }
 
 public record LeaveLobbyDto

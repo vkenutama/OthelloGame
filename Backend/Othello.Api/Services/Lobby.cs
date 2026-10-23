@@ -29,8 +29,6 @@ public class Lobby
     public IPlayer CreatedBy { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public GameManager? Game { get; private set; }
-    public Action<IPlayer?>? OnPlayerJoined;
-    public Action<IPlayer?>? OnPlayerLeft;
 
     public Lobby(int id, IPlayer player, string name, bool isPublic)
     {
@@ -57,7 +55,6 @@ public class Lobby
 
             _players.Add(player);
         }
-        OnPlayerJoined?.Invoke(player);
         return true;
     }
 
@@ -70,9 +67,14 @@ public class Lobby
                 return false;
             }
 
+            // If player is host, give the room host to other player
+            if (player == CreatedBy && _players.Count >= MaxPlayers)
+            {
+                CreatedBy = _players.FirstOrDefault(p => !p.Equals(player))!;
+            }
             _players.Remove(player);
         }
-        OnPlayerLeft?.Invoke(player);
+        
         return true;
     }
 

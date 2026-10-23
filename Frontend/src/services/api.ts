@@ -1,6 +1,6 @@
 import { GetLobbyDetailsDto } from "../dtos/lobby_dto"
 
-const base_url = "http://localhost:5057"
+const base_url = ""
 
 const getLobby = async (): Promise<GetLobbyDetailsDto[] | null> => {
     try {

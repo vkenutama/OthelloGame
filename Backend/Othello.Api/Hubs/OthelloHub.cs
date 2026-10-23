@@ -7,16 +7,21 @@ using static Othello.Api.Utils.Utility;
 
 namespace Othello.Api.Hubs;
 
-public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContext<OthelloHub, IGameClient> hubContext) : Hub<IGameClient>, IOthelloHubService, IOthelloGameplayService
+public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContext<OthelloHub, IGameClient> hubContext)
+    : Hub<IGameClient>, IOthelloHubService, IOthelloGameplayService
 {
     private readonly ConcurrentDictionary<int, Lobby> _lobbies = gameService;
 
+    /// <summary>
+    /// Key = player username, Value = connection id string
+    /// </summary>
     private static readonly ConcurrentDictionary<string, string> PlayersConnections = new();
 
     private int LobbyCount() => _lobbies.Count;
     private static int _lobbyId = 0;
 
     #region Lobby
+
     private string? GetGroupId(int lobbyId)
     {
         if (!_lobbies.TryGetValue(lobbyId, out var lobby))
@@ -35,17 +40,25 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             return;
         }
 
-        bool playerAlreadyInLobby = _lobbies.Values.Any(l => l.Players.Any(p => CheckPlayerUsernameEquality(p.Name, dto.Player.Name)));
-        if (playerAlreadyInLobby)
+        var existingLobby = _lobbies.Values.FirstOrDefault(l => l.Players.Any(p => CheckPlayerUsernameEquality(p.Name, dto.Player.Name)));
+        if (existingLobby != null)
         {
-            await Clients.Caller.ErrorMessage("Cannot create lobby when the player is already in a lobby.");
-            return;
+            if (dto.IsAiGame || (existingLobby.Game != null && existingLobby.Game.IsGameOver()))
+            {
+                _lobbies.TryRemove(existingLobby.Id, out _);
+            }
+            else
+            {
+                await Clients.Caller.ErrorMessage("Cannot create lobby when the player is already in a lobby.");
+                return;
+            }
         }
 
         int id = Interlocked.Increment(ref _lobbyId);
         Lobby lobby = new Lobby(id, dto.Player, dto.Name, dto.IsPublic);
 
         bool isCreated = _lobbies.TryAdd(id, lobby);
+
 
         if (!isCreated)
         {
@@ -58,6 +71,15 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
         {
             await Clients.Caller.ErrorMessage("Internal server error occurred");
             return;
+        }
+
+        if (dto.IsAiGame)
+        {
+            lobby.IsPublic = false;
+            lobby.Join(new GreedyAIPlayer()
+            {
+                Name = "Greedy AI",
+            });
         }
 
         PlayersConnections.AddOrUpdate(dto.Player.Name, Context.ConnectionId, (_, _) => Context.ConnectionId);
@@ -83,23 +105,54 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             return;
         }
 
-        bool success = lobby.Leave(player);
-        if (!success)
+        // 1. If match is active in this lobby, player leaving forfeits and other player wins!
+        if (lobby.Game != null && !lobby.Game.IsGameOver())
         {
-            await Clients.Caller.ErrorMessage("Cannot leave this lobby");
-            return;
-        }
+            var remainingPlayer = lobby.Players.FirstOrDefault(p => !CheckPlayerUsernameEquality(p.Name, player.Name));
+            if (remainingPlayer != null)
+            {
+                var remainingColor = remainingPlayer.Color == PieceColor.Black ? "BlackWins" : "WhiteWins";
+                var score = lobby.Game.GetScore();
+                var finalState = GameSessionService.ToStateDto(lobby.Id.ToString(), lobby.Game);
 
-        if (lobby.Players.Count == 0)
-        {
+                var forfeitState = finalState with
+                {
+                    ValidMoves = [], IsGameOver = true, Winner = remainingPlayer.Name
+                };
+
+                await Clients.Group(groupId!)
+                    .ReceiveBroadcast($"{player.Name} left the game. {remainingPlayer.Name} wins by forfeit!");
+                await Clients.Group(groupId!).GameOver($"{remainingColor} (Forfeit)", score.Black, score.White);
+                await Clients.Group(groupId!).ReceiveGameState(forfeitState);
+            }
+
+            // Disband the lobby since game is over and player left
             _lobbies.TryRemove(lobby.Id, out _);
+            await Clients.Group(groupId!).LobbyDeleted($"Match disbanded because {player.Name} left.");
+        }
+        else
+        {
+            // Lobby waiting room mode
+            bool success = lobby.Leave(player);
+            if (!success)
+            {
+                await Clients.Caller.ErrorMessage("Cannot leave this lobby");
+                return;
+            }
+
+            if (lobby.Players.Count == 0)
+            {
+                _lobbies.TryRemove(lobby.Id, out _);
+            }
+
+            if (lobby.Players.Count > 0)
+            {
+                await Clients.Group(groupId!).ReceiveBroadcast($"{player.Name} left the lobby");
+                await Clients.Group(groupId!).ReceiveBroadcast($"Host is now {lobby.CreatedBy.Name}");
+            }
         }
 
         PlayersConnections.Remove(player.Name, out _);
-
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupId!);
-        await Clients.Caller.ReceiveBroadcast("Left lobby");
-        await Clients.Group(groupId!).ReceiveBroadcast($"{player.Name} left the lobby");
     }
 
     public async Task DeleteLobby(DeleteLobbyDto dto)
@@ -151,16 +204,29 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             return;
         }
 
+        var lobbyGroupId = GetGroupId(lobby.Id);
+
+        // Check if player is already in this lobby (reconnecting / rejoining after lag or page reload)
+        bool alreadyInThisLobby = lobby.Players.Any(p => CheckPlayerUsernameEquality(p.Name, dto.Player.Name));
+        if (alreadyInThisLobby)
+        {
+            PlayersConnections.AddOrUpdate(dto.Player.Name, Context.ConnectionId, (_, _) => Context.ConnectionId);
+            await Groups.AddToGroupAsync(Context.ConnectionId, lobbyGroupId!);
+            await Clients.Caller.ReceiveBroadcast($"Reconnected to lobby {lobby.Name}!");
+            return;
+        }
+
         if (lobby.IsFull())
         {
             await Clients.Caller.ErrorMessage("Lobby is already full");
             return;
         }
 
-        bool playerAlreadyInLobby = _lobbies.Values.Any(l => l.Players.Any(p => CheckPlayerUsernameEquality(p.Name, dto.Player.Name)));
+        bool playerAlreadyInLobby = _lobbies.Values.Any(l =>
+            l.Id != lobby.Id && l.Players.Any(p => CheckPlayerUsernameEquality(p.Name, dto.Player.Name)));
         if (playerAlreadyInLobby)
         {
-            await Clients.Caller.ErrorMessage("Player is already in a lobby");
+            await Clients.Caller.ErrorMessage("Player is already in another lobby");
             return;
         }
 
@@ -170,8 +236,6 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             await Clients.Caller.ErrorMessage("Cannot join this lobby");
             return;
         }
-
-        var lobbyGroupId = GetGroupId(lobby.Id);
 
         PlayersConnections.AddOrUpdate(dto.Player.Name, Context.ConnectionId, (_, _) => Context.ConnectionId);
         await Groups.AddToGroupAsync(Context.ConnectionId, lobbyGroupId!);
@@ -191,9 +255,11 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
 
         await Clients.Group(groupId).ReceiveBroadcast(message);
     }
+
     #endregion
 
     #region Game
+
     public async Task MakeMove(MakeMoveDto dto)
     {
         // Check also the connection id
@@ -202,21 +268,21 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             await Clients.Caller.ErrorMessage("Unauthorized: You cannot move for another player.");
             return;
         }
-        
+
         // Check if lobby exists
         if (!_lobbies.TryGetValue(dto.LobbyId, out var lobby))
         {
             await Clients.Caller.ErrorMessage("Lobby not found");
             return;
         }
-        
+
         // Check if player belongs to this lobby
         if (!lobby.Players.Any(p => CheckPlayerUsernameEquality(p.Name, dto.PlayerUsername)))
         {
             await Clients.Caller.ErrorMessage($"Player {dto.PlayerUsername} does not belong to this lobby");
             return;
         }
-        
+
         // Get the game 
         GameManager? game = lobby.Game;
         if (game == null)
@@ -224,15 +290,16 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             await Clients.Caller.ErrorMessage("Game is not started yet, or the lobby is not started yet");
             return;
         }
-        
+
         // Check if this player is current turn
         var activePlayer = game.GetPlayer(game.CurrentTurn);
         if (!CheckPlayerUsernameEquality(dto.PlayerUsername, activePlayer.Name))
         {
-            await Clients.Caller.ErrorMessage($"This is not your turn. Waiting for {activePlayer.Name} ({game.CurrentTurn}).");
+            await Clients.Caller.ErrorMessage(
+                $"This is not your turn. Waiting for {activePlayer.Name} ({game.CurrentTurn}).");
             return;
         }
-        
+
         // Try play move
         MoveResult result = game.TryPlayMove(new Position
         {
@@ -246,7 +313,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             return;
         }
     }
-    
+
     public async Task StartGame(StartGameDto dto)
     {
         // Guard impersonation
@@ -261,7 +328,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             await Clients.Caller.ErrorMessage("Lobby not found");
             return;
         }
-        
+
         // Check if the player is host
         if (!CheckPlayerUsernameEquality(lobby.CreatedBy.Name, dto.PlayerUsername))
         {
@@ -275,7 +342,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             await Clients.Caller.ErrorMessage("Lobby needs 2 players to start a game");
             return;
         }
-        
+
         // Already started
         if (lobby.Game != null && !lobby.Game.IsGameOver())
         {
@@ -288,7 +355,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
         var whitePlayer = game.GetPlayer(PieceColor.White);
 
         var groupId = GetGroupId(lobby.Id);
-        
+
         await Clients.Group(groupId!).ReceiveBroadcast(
             $"Game started! {blackPlayer.Name} is Black (B), {whitePlayer.Name} is White (W). Black moves first!"
         );
@@ -301,8 +368,29 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
         var disconnectedPlayer = PlayersConnections.FirstOrDefault(x => x.Value == Context.ConnectionId);
         if (!string.IsNullOrEmpty(disconnectedPlayer.Key))
         {
+            
+            // We should check if player have relation to lobby
+            HumanPlayer player = new HumanPlayer()
+            {
+                Name = disconnectedPlayer.Key
+            };
+
+            var lobby = _lobbies.Values.FirstOrDefault(l => l.Players.Any(p => p.Name == player.Name));
+
+            if (lobby != null)
+            {
+                await LeaveLobby(new LeaveLobbyDto()
+                {
+                    LobbyId = lobby.Id,
+                    PlayerUsername = player.Name
+                });
+            }
+            
             PlayersConnections.TryRemove(disconnectedPlayer.Key, out _);
         }
+
+        
+
 
         await base.OnDisconnectedAsync(exception);
     }
