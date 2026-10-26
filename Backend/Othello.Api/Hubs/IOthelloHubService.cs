@@ -8,4 +8,6 @@ public interface IOthelloHubService
     Task LeaveLobby(LeaveLobbyDto dto);
     Task DeleteLobby(DeleteLobbyDto dto);
     Task JoinLobby(JoinLobbyDto dto);
+    Task GetMyLobby(string username);
+    Task PostChat(SendChatDto dto);
 }

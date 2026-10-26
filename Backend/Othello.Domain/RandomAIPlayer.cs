@@ -1,16 +1,21 @@
-﻿using Othello.Domain.Interfaces;
+using Othello.Domain.Interfaces;
 
 namespace Othello.Domain;
 
-// ReSharper disable once InconsistentNaming
 public class RandomAIPlayer : IAutoPlayer
 {
-    private Random _random = new Random();
+    private readonly Random _random = new Random();
     public PieceColor Color { get; set; }
-    public string Name { get; set; }
-    
+    public string Name { get; set; } = "Random AI";
+
     public Move ChooseMove(IReadOnlyList<Move> moves)
     {
-        throw new NotImplementedException();
+        if (moves == null || moves.Count == 0)
+        {
+            throw new InvalidOperationException("No valid moves available for AI.");
+        }
+
+        int index = _random.Next(moves.Count);
+        return moves[index];
     }
 }

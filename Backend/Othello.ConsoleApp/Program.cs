@@ -23,7 +23,7 @@ class Program
         AnsiConsole.WriteLine();
 
         var player1 = new HumanPlayer { Name = "Player 1" };
-        var player2 = new HumanPlayer { Name = "Player 2" };
+        var player2 = new GreedyAIPlayer();
         var game = new GameManager(player1, player2);
 
         var eventLogs = new List<string>();

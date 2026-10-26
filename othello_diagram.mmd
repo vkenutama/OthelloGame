@@ -1,0 +1,197 @@
+classDiagram
+    direction TB
+
+    %% ===== Hub =====
+    class GameManager {
+        +IBoard Board
+        +PieceColor CurrentTurn
+        +GameResult? Result
+        -IPlayer _blackPlayer
+        -IPlayer _whitePlayer
+        -IPiece _blackPiece
+        -IPiece _whitePiece
+        -bool _isStarted
+        -bool _isProcessing
+        -IReadOnlyList~Direction~ _directions$
+        +event Action GameStarted
+        +event Action~Move~ MovePlayed
+        +event Action~Score~ ScoreChanged
+        +event Action~PieceColor~ TurnChanged
+        +event Action~PieceColor~ TurnSkipped
+        +event Action~GameResult~ GameOver
+        +GameManager(IPlayer blackPlayer, IPlayer whitePlayer, IBoard board, IPiece blackPiece, IPiece whitePiece)
+        +IsGameOver() bool
+        +Start() MoveResult
+        +TryPlayMove(Position) MoveResult
+        +GetValidMoves() IReadOnlyList~Position~
+        +GetScore() Score
+        +GetPlayer(PieceColor) IPlayer
+        -PlaceInitialPieces() void
+        -PlayAutoTurns(List~Move~) void
+        -ApplyMove(Position, PieceColor) Move
+        -AdvanceTurn() void
+        -FindValidMoves(PieceColor) List~Move~
+        -GetFlips(Position, PieceColor) List~Position~
+        -GetCell(Position) ICell
+        -GetPiece(PieceColor) IPiece
+        -HasValidMove(PieceColor) bool
+        -TryGetResult(out GameResult) bool
+        -IsInside(Position) bool
+    }
+
+    %% ===== Board structure: interface and implementation side by side =====
+    class IBoard {
+        <<interface>>
+        +int Size
+        +ICell[,] Cells
+    }
+
+    class Board {
+        +int Size
+        +ICell[,] Cells
+    }
+
+    class ICell {
+        <<interface>>
+        +Position Position
+        +IPiece? Piece
+    }
+
+    class Cell {
+        +Position Position
+        +IPiece? Piece
+    }
+
+    class IPiece {
+        <<interface>>
+        +PieceColor Color
+    }
+
+    class Piece {
+        +PieceColor Color
+    }
+
+    %% ===== Players =====
+    class IPlayer {
+        <<interface>>
+        +PieceColor Color
+        +string Name
+    }
+
+    class IAutoPlayer {
+        <<interface>>
+        +ChooseMove(IReadOnlyList~Move~) Move
+    }
+
+    class HumanPlayer {
+        +PieceColor Color
+        +string Name
+    }
+
+    class RandomAIPlayer {
+        -Random _random
+        +PieceColor Color
+        +string Name
+        +ChooseMove(IReadOnlyList~Move~) Move
+    }
+
+    class GreedyAIPlayer {
+        +PieceColor Color
+        +string Name
+        +ChooseMove(IReadOnlyList~Move~) Move
+    }
+
+    %% ===== Move data =====
+    class MoveResult {
+        <<record>>
+        +MoveFailureReason Failure
+        +IReadOnlyList~Move~ Moves
+        +bool IsSuccess
+    }
+
+    class Move {
+        <<record>>
+        +Position Target
+        +PieceColor Color
+        +IReadOnlyList~Position~ Flipped
+    }
+
+    class Position {
+        <<readonly struct>>
+        +int Row
+        +int Col
+    }
+
+    class Direction {
+        <<readonly struct>>
+        +int DRow
+        +int DCol
+    }
+
+    class Score {
+        <<readonly struct>>
+        +int Black
+        +int White
+    }
+
+    %% ===== Enumerations =====
+    class PieceColor {
+        <<enumeration>>
+        Black
+        White
+    }
+
+    class GameResult {
+        <<enumeration>>
+        BlackWins
+        WhiteWins
+        Draw
+    }
+
+    class MoveFailureReason {
+        <<enumeration>>
+        None
+        NotStarted
+        AlreadyStarted
+        GameOver
+        OutOfBounds
+        CellOccupied
+        NoPiecesFlipped
+        ReentrantCall
+    }
+
+    %% ===== GameManager (hub): depends on abstractions only, all injected =====
+    GameManager "1" -- "1" IBoard : Board
+    GameManager "1" -- "2" IPlayer : _blackPlayer, _whitePlayer
+    GameManager "1" -- "2" IPiece : _blackPiece, _whitePiece
+    GameManager ..> IAutoPlayer : plays automated turns
+    GameManager ..> Direction : scans with _directions
+    GameManager ..> MoveResult : returns
+    GameManager ..> Move : creates
+    GameManager ..> Score : returns
+    GameManager "1" -- "1" PieceColor : CurrentTurn
+    GameManager "1" -- "0..1" GameResult : Result
+
+    %% ===== Board structure (parent above child) =====
+    IBoard <|.. Board
+    ICell <|.. Cell
+    IPiece <|.. Piece
+    IBoard "1" -- "64" ICell : Cells
+    Board "1" *-- "64" Cell : Cells
+    Cell "0..64" -- "0..1" IPiece : Piece
+
+    %% ===== Players (LSP: only automated players have ChooseMove) =====
+    IPlayer <|-- IAutoPlayer
+    IPlayer <|.. HumanPlayer
+    IAutoPlayer <|.. RandomAIPlayer
+    IAutoPlayer <|.. GreedyAIPlayer
+
+    %% ===== Move data =====
+    MoveResult "1" -- "0..*" Move : Moves
+    Move "1" -- "1..*" Position : Flipped
+    MoveResult "1" -- "1" MoveFailureReason : Failure
+    Move "1" -- "1" PieceColor : Color
+
+    %% ===== Enumerations used by the abstractions =====
+    IPiece "1" -- "1" PieceColor : Color
+    IPlayer "1" -- "1" PieceColor : Color
