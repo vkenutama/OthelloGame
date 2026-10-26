@@ -1,13 +1,17 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
 using Othello.Api.Dtos;
+using Othello.Api.Models;
 using Othello.Api.Services;
 using Othello.Domain;
 using static Othello.Api.Utils.Utility;
 
 namespace Othello.Api.Hubs;
 
-public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContext<OthelloHub, IGameClient> hubContext)
+public class OthelloHub(
+    ConcurrentDictionary<int, Lobby> gameService,
+    IHubContext<OthelloHub, IGameClient> hubContext,
+    List<IChat> chats)
     : Hub<IGameClient>, IOthelloHubService, IOthelloGameplayService
 {
     private readonly ConcurrentDictionary<int, Lobby> _lobbies = gameService;
@@ -15,7 +19,14 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
     /// <summary>
     /// Key = player username, Value = connection id string
     /// </summary>
-    private static readonly ConcurrentDictionary<string, string> PlayersConnections = new();
+    private static readonly ConcurrentDictionary<string, string> LobbyPlayersConnections = new();
+
+    /// <summary>
+    /// Hold the chats for the session
+    /// </summary>
+    private readonly List<IChat> _chats = chats;
+
+    private readonly HashSet<string> _allConnectedPlayers = new();
 
     private int LobbyCount() => _lobbies.Count;
     private static int _lobbyId = 0;
@@ -32,6 +43,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
         return $"lobby_{lobby.Id}";
     }
 
+
     public async Task CreateLobby(CreateLobbyDto dto)
     {
         if (dto.Player == null || string.IsNullOrWhiteSpace(dto.Player.Name))
@@ -40,7 +52,8 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             return;
         }
 
-        var existingLobby = _lobbies.Values.FirstOrDefault(l => l.Players.Any(p => CheckPlayerUsernameEquality(p.Name, dto.Player.Name)));
+        var existingLobby = _lobbies.Values.FirstOrDefault(l =>
+            l.Players.Any(p => CheckPlayerUsernameEquality(p.Name, dto.Player.Name)));
         if (existingLobby != null)
         {
             if (dto.IsAiGame || (existingLobby.Game != null && existingLobby.Game.IsGameOver()))
@@ -49,13 +62,18 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             }
             else
             {
-                await Clients.Caller.ErrorMessage("Cannot create lobby when the player is already in a lobby.");
+                await JoinLobby(new JoinLobbyDto
+                {
+                    LobbyId = existingLobby.Id,
+                    Player = dto.Player,
+                    Password = dto.Password
+                });
                 return;
             }
         }
 
         int id = Interlocked.Increment(ref _lobbyId);
-        Lobby lobby = new Lobby(id, dto.Player, dto.Name, dto.IsPublic);
+        Lobby lobby = new Lobby(id, dto.Player, dto.Name, dto.IsPublic, dto.Password);
 
         bool isCreated = _lobbies.TryAdd(id, lobby);
 
@@ -82,7 +100,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             });
         }
 
-        PlayersConnections.AddOrUpdate(dto.Player.Name, Context.ConnectionId, (_, _) => Context.ConnectionId);
+        LobbyPlayersConnections.AddOrUpdate(dto.Player.Name, Context.ConnectionId, (_, _) => Context.ConnectionId);
 
         await Groups.AddToGroupAsync(Context.ConnectionId, lobbyGroupId);
         await Clients.Caller.ReceiveBroadcast($"Lobby {lobby.Name} created with ID {lobby.Id}");
@@ -152,7 +170,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             }
         }
 
-        PlayersConnections.Remove(player.Name, out _);
+        LobbyPlayersConnections.Remove(player.Name, out _);
     }
 
     public async Task DeleteLobby(DeleteLobbyDto dto)
@@ -182,7 +200,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
 
         foreach (var p in lobby.Players)
         {
-            var removed = PlayersConnections.TryRemove(p.Name, out var connectionId);
+            var removed = LobbyPlayersConnections.TryRemove(p.Name, out var connectionId);
             if (removed)
             {
                 await Groups.RemoveFromGroupAsync(connectionId!, groupId!);
@@ -210,7 +228,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
         bool alreadyInThisLobby = lobby.Players.Any(p => CheckPlayerUsernameEquality(p.Name, dto.Player.Name));
         if (alreadyInThisLobby)
         {
-            PlayersConnections.AddOrUpdate(dto.Player.Name, Context.ConnectionId, (_, _) => Context.ConnectionId);
+            LobbyPlayersConnections.AddOrUpdate(dto.Player.Name, Context.ConnectionId, (_, _) => Context.ConnectionId);
             await Groups.AddToGroupAsync(Context.ConnectionId, lobbyGroupId!);
             await Clients.Caller.ReceiveBroadcast($"Reconnected to lobby {lobby.Name}!");
             return;
@@ -219,6 +237,13 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
         if (lobby.IsFull())
         {
             await Clients.Caller.ErrorMessage("Lobby is already full");
+            return;
+        }
+
+        // Verify password if lobby is protected
+        if (dto.Password != null && !lobby.VerifyPassword(dto.Password))
+        {
+            await Clients.Caller.ErrorMessage("Incorrect lobby password");
             return;
         }
 
@@ -237,11 +262,67 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
             return;
         }
 
-        PlayersConnections.AddOrUpdate(dto.Player.Name, Context.ConnectionId, (_, _) => Context.ConnectionId);
+        LobbyPlayersConnections.AddOrUpdate(dto.Player.Name, Context.ConnectionId, (_, _) => Context.ConnectionId);
         await Groups.AddToGroupAsync(Context.ConnectionId, lobbyGroupId!);
 
         // Broadcast directly to the room
         await Clients.Group(lobbyGroupId!).ReceiveBroadcast($"Player {dto.Player.Name} joined lobby {lobby.Name}!");
+    }
+
+    public async Task GetMyLobby(string username)
+    {
+        var lobby = _lobbies.Values.FirstOrDefault(l => l.Players.FirstOrDefault(p => p.Name == username) != null);
+
+        if (lobby != null)
+        {
+            await Clients.Caller.ReceiveBroadcast(lobby.Id.ToString());
+        }
+    }
+
+    public async Task PostChat(SendChatDto dto)
+    {
+        Chat chat = new Chat
+        {
+            Message = dto.Message,
+            Username = dto.Username,
+            PostedAt = DateTime.UtcNow,
+            LobbyId = dto.LobbyId
+        };
+
+        _chats.Add(chat);
+
+        var messageId = Guid.NewGuid().ToString();
+
+        // Broadcast to all
+        if (dto.LobbyId == null)
+        {
+            await Clients.All.ReceiveChat(new ReceiveChatDto
+            {
+                Id = messageId,
+                Message = chat.Message,
+                Username = chat.Username,
+                PostedAt = chat.PostedAt,
+                LobbyId = null
+            });
+        }
+        // Broadcast only to lobby chat
+        else
+        {
+            bool found = _lobbies.TryGetValue(dto.LobbyId.Value, out var lobby);
+            if (!found)
+                return;
+
+            var groupId = GetGroupId(lobby!.Id);
+
+            await Clients.Group(groupId!).ReceiveChat(new ReceiveChatDto
+            {
+                Id = messageId,
+                Message = chat.Message,
+                Username = chat.Username,
+                PostedAt = chat.PostedAt,
+                LobbyId = dto.LobbyId
+            });
+        }
     }
 
     public async Task BroadcastMessage(int lobbyId, string message)
@@ -263,7 +344,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
     public async Task MakeMove(MakeMoveDto dto)
     {
         // Check also the connection id
-        if (!PlayersConnections.TryGetValue(dto.PlayerUsername, out var connId) || connId != Context.ConnectionId)
+        if (!LobbyPlayersConnections.TryGetValue(dto.PlayerUsername, out var connId) || connId != Context.ConnectionId)
         {
             await Clients.Caller.ErrorMessage("Unauthorized: You cannot move for another player.");
             return;
@@ -317,7 +398,7 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
     public async Task StartGame(StartGameDto dto)
     {
         // Guard impersonation
-        if (!PlayersConnections.TryGetValue(dto.PlayerUsername, out var connId) || connId != Context.ConnectionId)
+        if (!LobbyPlayersConnections.TryGetValue(dto.PlayerUsername, out var connId) || connId != Context.ConnectionId)
         {
             await Clients.Caller.ErrorMessage("You cannot start a game");
             return;
@@ -363,12 +444,18 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
 
     #endregion
 
+    public override Task OnConnectedAsync()
+    {
+        bool isAdded = _allConnectedPlayers.Add(Context.ConnectionId);
+        return base.OnConnectedAsync();
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        var disconnectedPlayer = PlayersConnections.FirstOrDefault(x => x.Value == Context.ConnectionId);
+        var disconnectedPlayer = LobbyPlayersConnections.FirstOrDefault(x => x.Value == Context.ConnectionId);
+
         if (!string.IsNullOrEmpty(disconnectedPlayer.Key))
         {
-            
             // We should check if player have relation to lobby
             HumanPlayer player = new HumanPlayer()
             {
@@ -385,12 +472,11 @@ public class OthelloHub(ConcurrentDictionary<int, Lobby> gameService, IHubContex
                     PlayerUsername = player.Name
                 });
             }
-            
-            PlayersConnections.TryRemove(disconnectedPlayer.Key, out _);
+
+            LobbyPlayersConnections.TryRemove(disconnectedPlayer.Key, out _);
         }
 
-        
-
+        _allConnectedPlayers.Remove(Context.ConnectionId);
 
         await base.OnDisconnectedAsync(exception);
     }

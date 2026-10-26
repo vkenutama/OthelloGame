@@ -10,7 +10,8 @@ import {
     PlayerColor
 } from "../types/othello"
 import { useEffect, useState } from 'react'
-import { getLobby } from './api'
+import { getLobby, getLobbyByPlayerUsername } from './api'
+import { SendChatDto, ReceiveChatDto, ChatMessageItem } from '../dtos/chat_dto';
 
 const HUB_URL = import.meta.env.VITE_HUB_URL || "/othello/hub";
 
@@ -23,6 +24,7 @@ export function useOthelloSignalR() {
     const [lastMove, setLastMove] = useState<MoveResultDto | null>(null);
     const [gameOverResult, setGameOverResult] = useState<string | null>(null);
     const [messages, setMessages] = useState<string[]>([]);
+    const [chatMessages, setChatMessages] = useState<ChatMessageItem[]>([]);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -93,6 +95,48 @@ export function useOthelloSignalR() {
             setMessages((prev) => [...prev, msg]);
         });
 
+        newConnection.on("ReceiveChat", (raw: ReceiveChatDto) => {
+            if (!isMounted) return;
+
+            const rawId = raw.id ?? raw.Id;
+            const message = raw.message ?? raw.Message ?? "";
+            const username = raw.username ?? raw.Username ?? "Unknown";
+            const rawDate = raw.postedAt ?? raw.PostedAt;
+            const postedAt = rawDate ? new Date(rawDate) : new Date();
+            const lobbyId = raw.lobbyId !== undefined ? raw.lobbyId : (raw.LobbyId !== undefined ? raw.LobbyId : null);
+
+            const messageId = rawId || `${username}_${postedAt.getTime()}_${message}`;
+
+            setChatMessages((prev) => {
+                // 1. Exact ID deduplication
+                if (prev.some((m) => m.id === messageId)) {
+                    return prev;
+                }
+
+                // 2. Fallback deduplication: same user, message, and channel within 2 seconds
+                const isDuplicateContent = prev.some(
+                    (m) =>
+                        m.username.toLowerCase() === username.toLowerCase() &&
+                        m.message === message &&
+                        m.lobbyId === lobbyId &&
+                        Math.abs(new Date(m.postedAt).getTime() - postedAt.getTime()) < 2000
+                );
+                if (isDuplicateContent) {
+                    return prev;
+                }
+
+                const newChat: ChatMessageItem = {
+                    id: messageId,
+                    message,
+                    username,
+                    postedAt,
+                    lobbyId: lobbyId ?? null,
+                };
+
+                return [...prev, newChat];
+            });
+        });
+
         const connect = async () => {
             if (newConnection.state === signalR.HubConnectionState.Disconnected) {
                 try {
@@ -102,6 +146,8 @@ export function useOthelloSignalR() {
                         console.log("Connected to SignalR Hub")
                         setIsConnected(true);
                         setError(null);
+                    } else {
+                        void newConnection.stop();
                     }
                 } catch (err) {
                     if (isMounted) {
@@ -116,6 +162,7 @@ export function useOthelloSignalR() {
         connect();
 
         retryTimer = setInterval(() => {
+            if (!isMounted) return;
             if (newConnection.state === signalR.HubConnectionState.Disconnected) {
                 console.log("Reconnecting to Hub...")
                 connect();
@@ -127,9 +174,20 @@ export function useOthelloSignalR() {
 
         return () => {
             isMounted = false;
-            if (retryTimer) clearInterval(retryTimer); // Stop timer
-            if (newConnection.state === signalR.HubConnectionState.Connected) {
-                newConnection.stop();
+            if (retryTimer) clearInterval(retryTimer);
+
+            // Detach listeners to prevent stale connections from firing callbacks
+            newConnection.off("ReceiveGameState");
+            newConnection.off("MovePlayed");
+            newConnection.off("TurnSkipped");
+            newConnection.off("GameOver");
+            newConnection.off("ErrorMessage");
+            newConnection.off("ReceiveBroadcast");
+            newConnection.off("LobbyDeleted");
+            newConnection.off("ReceiveChat");
+
+            if (newConnection.state !== signalR.HubConnectionState.Disconnected) {
+                newConnection.stop().catch(() => {});
             }
         };
     }, []);
@@ -139,7 +197,8 @@ export function useOthelloSignalR() {
         lobbyName: string,
         isPublic: boolean,
         playerName: string,
-        isAiGame: boolean = false
+        isAiGame: boolean = false,
+        password?: string
     ): Promise<{ id: number; name: string } | null> => {
         if (!connection) throw new Error("Not connected to server");
         const dto: CreateLobbyDto = {
@@ -148,7 +207,8 @@ export function useOthelloSignalR() {
             },
             name: lobbyName,
             isPublic: isPublic,
-            isAiGame: isAiGame
+            isAiGame: isAiGame,
+            password: password ? password.trim() : undefined
         };
 
         return new Promise(async (resolve, reject) => {
@@ -208,13 +268,54 @@ export function useOthelloSignalR() {
     };
 
     // 2. Join a lobby
-    const joinLobby = async (lobbyId: number, playerName: string) => {
-        if (!connection) return;
+    const joinLobby = async (lobbyId: number, playerName: string, password?: string): Promise<void> => {
+        if (!connection) throw new Error("Not connected to server");
         const dto: JoinLobbyDto = {
             lobbyId,
             player: { name: playerName },
+            password: password ? password.trim() : undefined,
         };
-        await connection.invoke("JoinLobby", dto);
+
+        return new Promise(async (resolve, reject) => {
+            let handled = false;
+
+            const broadcastHandler = (msg: string) => {
+                if (msg.includes("joined lobby") || msg.includes("Reconnected to lobby")) {
+                    handled = true;
+                    cleanup();
+                    resolve();
+                }
+            };
+
+            const errorHandler = (err: string) => {
+                handled = true;
+                cleanup();
+                reject(new Error(err));
+            };
+
+            const cleanup = () => {
+                connection.off("ReceiveBroadcast", broadcastHandler);
+                connection.off("ErrorMessage", errorHandler);
+            };
+
+            connection.on("ReceiveBroadcast", broadcastHandler);
+            connection.on("ErrorMessage", errorHandler);
+
+            try {
+                await connection.invoke("JoinLobby", dto);
+
+                setTimeout(() => {
+                    if (!handled) {
+                        cleanup();
+                        resolve();
+                    }
+                }, 1500);
+            } catch (err) {
+                handled = true;
+                cleanup();
+                reject(err);
+            }
+        });
     };
 
     // 3. Leave a lobby
@@ -253,18 +354,55 @@ export function useOthelloSignalR() {
         await connection.invoke("MakeMove", dto);
     };
 
+    const postChat = async (
+        username: string,
+        message: string,
+        toLobbyChat: boolean,
+        explicitLobbyId?: number | null
+    ) => {
+        if (!connection || connection.state !== signalR.HubConnectionState.Connected) return;
+
+        let targetLobbyId: number | null = null;
+        if (toLobbyChat) {
+            if (explicitLobbyId !== undefined && explicitLobbyId !== null) {
+                targetLobbyId = explicitLobbyId;
+            } else {
+                const lobby = await getLobbyByPlayerUsername(username);
+                if (lobby === null) {
+                    console.warn("Could not find lobby for player to send lobby chat");
+                    return;
+                }
+                dto_id: targetLobbyId = lobby.id;
+            }
+        }
+
+        const dto: SendChatDto = {
+            LobbyId: targetLobbyId,
+            Username: username,
+            Message: message,
+        };
+
+        try {
+            await connection.invoke("PostChat", dto);
+        } catch (err) {
+            console.error("Failed to post chat message:", err);
+        }
+    };
+
     return {
         isConnected,
         gameState,
         lastMove,
         gameOverResult,
         messages,
+        chatMessages,
         error,
         clearError: () => setError(null),
         createLobby,
         joinLobby,
         leaveLobby,
         startGame,
-        makeMove
+        makeMove,
+        postChat
     }
 }

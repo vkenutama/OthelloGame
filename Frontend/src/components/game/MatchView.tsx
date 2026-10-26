@@ -201,7 +201,7 @@ export function MatchView({
               : "bg-slate-950/70 border-slate-800"
           }`}>
             <span className="text-2xl font-black text-white">{gameState.blackScore}</span>
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Discs</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Piece</span>
           </div>
         </div>
 
@@ -278,7 +278,7 @@ export function MatchView({
               : "bg-slate-950/70 border-slate-800 text-slate-300"
           }`}>
             <span className="text-2xl font-black text-white">{gameState.whiteScore}</span>
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Discs</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Piece</span>
           </div>
 
           <div className="relative z-10 flex-1 min-w-0 text-right">

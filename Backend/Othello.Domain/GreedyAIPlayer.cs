@@ -15,7 +15,6 @@ public class GreedyAIPlayer : IAutoPlayer
             throw new InvalidOperationException("No valid moves available for AI.");
         }
 
-        // Greedy strategy: pick the move that flips the most opponent pieces
         return moves.OrderByDescending(m => m.Flipped.Count).First();
     }
 }

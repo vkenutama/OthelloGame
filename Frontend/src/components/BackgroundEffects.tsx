@@ -77,28 +77,33 @@ export function BackgroundEffects() {
         className="absolute inset-0 transition-opacity duration-300"
         style={{
           opacity: "var(--spotlight-opacity, 1)",
-          background: "radial-gradient(circle 220px at var(--mouse-x, 50%) var(--mouse-y, 40%), rgba(255, 255, 255, 0.025), transparent 70%)"
+          background: "radial-gradient(circle 240px at var(--mouse-x, 50%) var(--mouse-y, 40%), rgba(56, 189, 248, 0.05), transparent 70%)"
         }}
       />
 
-      {/* 4. Top-Left Cyan Ambient Nebula with Blooming Glow (Solo AI Aura) */}
+      {/* 4. Top-Left Cyan Ambient Nebula (Roaming Solo/Cyber Aura) */}
       <div 
-        className="absolute -top-28 -left-28 h-[550px] w-[550px] rounded-full bg-cyan-500/16 animate-nebula-bloom-1"
+        className="absolute -top-28 -left-28 h-[580px] w-[580px] rounded-full bg-gradient-to-br from-cyan-400/32 via-cyan-500/26 to-blue-500/18 animate-roam-glow-1"
       />
 
-      {/* 5. Bottom-Right Emerald Ambient Nebula with Blooming Glow (Online Match Aura) */}
+      {/* 5. Bottom-Right Emerald Ambient Nebula (Roaming Match/Jade Aura) */}
       <div 
-        className="absolute -bottom-28 -right-28 h-[600px] w-[600px] rounded-full bg-emerald-500/16 animate-nebula-bloom-2"
+        className="absolute -bottom-28 -right-28 h-[620px] w-[620px] rounded-full bg-gradient-to-tl from-emerald-400/32 via-emerald-500/26 to-teal-500/18 animate-roam-glow-2"
       />
 
-      {/* 6. Top-Center Soft Horizon Indigo Glow */}
+      {/* 6. Top-Center Soft Horizon Indigo / Purple Nebula (Roaming Cosmic Drift) */}
       <div 
-        className="absolute -top-36 left-1/2 -translate-x-1/2 h-[380px] w-[850px] rounded-full bg-indigo-600/12 animate-nebula-bloom-3"
+        className="absolute -top-36 left-1/2 -translate-x-1/2 h-[420px] w-[880px] rounded-full bg-gradient-to-r from-indigo-500/28 via-purple-500/24 to-violet-600/20 animate-roam-glow-3"
       />
 
-      {/* 7. Center Play-Area Grounding Glow */}
+      {/* 7. Bottom-Left Teal Ambient Nebula (Roaming Accent Aura) */}
       <div 
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[450px] w-[750px] rounded-full bg-cyan-950/25 blur-[160px]"
+        className="absolute -bottom-24 -left-24 h-[500px] w-[500px] rounded-full bg-gradient-to-tr from-teal-400/28 via-cyan-600/22 to-transparent animate-roam-glow-4"
+      />
+
+      {/* 8. Center Play-Area Grounding Glow */}
+      <div 
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[820px] rounded-full bg-cyan-950/40 blur-[150px]"
       />
     </div>
   );

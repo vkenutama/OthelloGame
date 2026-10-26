@@ -1,7 +1,7 @@
 import { useOthelloSignalR } from "./services/signal_r"
 import { GetLobbyDetailsDto } from "./dtos/lobby_dto"
-import { ActiveLobbyInfo } from "./types/othello"
-import { useEffect, useState, useCallback } from "react";
+import { ActiveLobbyInfo, formatLobbyInvite, parseLobbyInvite, LobbyInvitePayload } from "./types/othello"
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Navbar } from "./components/Navbar";
 import { DisconnectedModal } from "./components/DisconnectedModal";
 import { ModeSelection } from "./components/ModeSelection";
@@ -10,7 +10,10 @@ import { CreateLobbyModal } from "./components/lobby/CreateLobbyModal";
 import { LobbyRoom } from "./components/lobby/LobbyRoom";
 import { MatchView } from "./components/game/MatchView";
 import { BackgroundEffects } from "./components/BackgroundEffects";
-import { getLobby } from "./services/api"
+import { getLobby, getLobbyById } from "./services/api"
+import { ChatSidebar } from "./components/chat/ChatSidebar";
+import { ChallengeNotificationPopup } from "./components/notifications/ChallengeNotificationPopup";
+import { LobbyAlertPopup, LobbyAlertInfo } from "./components/notifications/LobbyAlertPopup";
 
 export type ViewMode = "menu" | "ai" | "online" | "lobby" | "in_game";
 
@@ -21,11 +24,13 @@ function App() {
     lastMove,
     gameOverResult,
     messages,
+    chatMessages,
     createLobby,
     joinLobby,
     leaveLobby,
     startGame,
-    makeMove
+    makeMove,
+    postChat
   } = useOthelloSignalR();
 
   const [lobbies, setLobbies] = useState<GetLobbyDetailsDto[] | null>(null);
@@ -43,6 +48,54 @@ function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [currentLobby, setCurrentLobby] = useState<ActiveLobbyInfo | null>(null);
   const [isStartingAi, setIsStartingAi] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Lobby error/status alert popup state
+  const [lobbyAlert, setLobbyAlert] = useState<LobbyAlertInfo | null>(null);
+
+  // Direct Match Challenge notification state
+  const [incomingChallenge, setIncomingChallenge] = useState<LobbyInvitePayload | null>(null);
+  const [sentChallengeNotice, setSentChallengeNotice] = useState<{ targetUser: string; lobbyId: number } | null>(null);
+  const lastHandledChatIdRef = useRef<string | null>(null);
+
+  // Monitor incoming chat messages for direct challenges targeted to this player
+  useEffect(() => {
+    if (chatMessages.length === 0) return;
+    const latest = chatMessages[chatMessages.length - 1];
+    if (!latest || latest.id === lastHandledChatIdRef.current) return;
+    lastHandledChatIdRef.current = latest.id;
+
+    const invite = parseLobbyInvite(latest.message);
+    if (invite && invite.targetUser) {
+      const isTargetedToMe = invite.targetUser.toLowerCase() === playerName.toLowerCase();
+      if (isTargetedToMe) {
+        // Do not pop up challenge if already joined in this exact lobby
+        if (!currentLobby || currentLobby.id !== invite.lobbyId) {
+          setIncomingChallenge(invite);
+        }
+      }
+    }
+  }, [chatMessages, playerName, currentLobby]);
+
+  // Auto-clear incoming challenge if user has joined that lobby or game started
+  useEffect(() => {
+    if (incomingChallenge && (currentLobby?.id === incomingChallenge.lobbyId || viewMode === "in_game")) {
+      setIncomingChallenge(null);
+    }
+  }, [incomingChallenge, currentLobby, viewMode]);
+
+  // Auto-clear sent challenge notice when opponent joins lobby or after timeout
+  useEffect(() => {
+    if (!sentChallengeNotice) return;
+    if (currentLobby && currentLobby.playersCount >= 2) {
+      setSentChallengeNotice(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setSentChallengeNotice(null);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [sentChallengeNotice, currentLobby]);
 
   const handleNameChange = (newName: string) => {
     const trimmed = newName.trim();
@@ -52,22 +105,24 @@ function App() {
     }
   };
 
-  const refreshLobbies = useCallback(() => {
-    getLobby().then((data) => {
-      if (data) setLobbies(data);
-    });
+  const refreshLobbies = useCallback(async () => {
+    try {
+      const data = await getLobby();
+      if (data !== null) {
+        setLobbies(data);
+      }
+      return data;
+    } catch (err) {
+      console.warn("Failed to refresh lobbies:", err);
+      return null;
+    }
   }, []);
 
-  // Initial fetch
+  // Fetch lobbies when viewing the online lobby browser
   useEffect(() => {
-    refreshLobbies();
-  }, [refreshLobbies]);
-
-  // Periodic refresh when browsing lobbies
-  useEffect(() => {
-    if (viewMode !== "online") return;
-    const interval = setInterval(refreshLobbies, 4000);
-    return () => clearInterval(interval);
+    if (viewMode === "online") {
+      refreshLobbies();
+    }
   }, [viewMode, refreshLobbies]);
 
   // If a game state arrives while in lobby waiting room or AI mode, transition automatically to in_game
@@ -157,51 +212,18 @@ function App() {
     }
   }, [messages, playerName, currentLobby, refreshLobbies]);
 
-  // Periodic server sync while in waiting room
-  useEffect(() => {
-    if (viewMode !== "lobby" || !currentLobby) return;
 
-    const interval = setInterval(async () => {
-      const list = await getLobby();
-      if (!list) return;
-
-      const serverLobby = list.find((l) => l.id === currentLobby.id);
-      if (serverLobby) {
-        setCurrentLobby((prev) => {
-          if (!prev) return null;
-          // Re-sync if host changed or player count changed on server
-          if (
-            prev.createdBy !== serverLobby.createdBy ||
-            prev.playersCount !== serverLobby.playersCount
-          ) {
-            return {
-              ...prev,
-              createdBy: serverLobby.createdBy,
-              playersCount: serverLobby.playersCount,
-              guestName: serverLobby.playersCount === 1 ? null : prev.guestName,
-            };
-          }
-          return prev;
-        });
-      } else {
-        // Room was removed on server
-        setCurrentLobby(null);
-        setViewMode("online");
-      }
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [viewMode, currentLobby]);
 
   // 1. Handle Lobby Creation
-  const handleCreateLobby = async (name: string, isPublic: boolean) => {
-    const result = await createLobby(name, isPublic, playerName);
+  const handleCreateLobby = async (name: string, isPublic: boolean, password?: string) => {
+    const result = await createLobby(name, isPublic, playerName, false, password);
     if (result) {
       setCurrentLobby({
         id: result.id,
         name: result.name,
         createdBy: playerName,
         isPublic,
+        hasPassword: Boolean(password && password.trim().length > 0),
         playersCount: 1,
         guestName: null,
       });
@@ -214,17 +236,185 @@ function App() {
   };
 
   // 2. Handle Joining a Lobby
-  const handleJoinLobby = async (lobby: GetLobbyDetailsDto) => {
-    await joinLobby(lobby.id, playerName);
-    setCurrentLobby({
-      id: lobby.id,
-      name: lobby.name,
-      createdBy: lobby.createdBy,
-      playersCount: lobby.playersCount + 1,
-      guestName: playerName,
-    });
-    setViewMode("lobby");
-    refreshLobbies();
+  const handleJoinLobby = async (lobby: GetLobbyDetailsDto, password?: string) => {
+    try {
+      // Pre-check if lobby exists and is open
+      const latestLobby = await getLobbyById(lobby.id);
+      if (!latestLobby) {
+        throw new Error(`Lobby "${lobby.name}" (#${lobby.id}) does not exist or has already been closed.`);
+      }
+
+      if (latestLobby.playersCount >= 2) {
+        throw new Error(`Lobby #${lobby.id} is already full.`);
+      }
+
+      await joinLobby(lobby.id, playerName, password);
+
+      setCurrentLobby({
+        id: lobby.id,
+        name: latestLobby.name || lobby.name,
+        createdBy: latestLobby.createdBy || lobby.createdBy,
+        isPublic: lobby.isPublic,
+        hasPassword: lobby.hasPassword,
+        playersCount: latestLobby.playersCount + 1,
+        guestName: playerName,
+      });
+      setViewMode("lobby");
+      refreshLobbies();
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to join lobby";
+      const isNotExist =
+        errorMsg.toLowerCase().includes("not found") ||
+        errorMsg.toLowerCase().includes("not exist") ||
+        errorMsg.toLowerCase().includes("closed") ||
+        errorMsg.toLowerCase().includes("no longer active");
+
+      setLobbyAlert({
+        id: lobby.id,
+        title: isNotExist ? "Lobby Does Not Exist" : "Unable to Join Room",
+        message: isNotExist
+          ? `Lobby "${lobby.name}" (#${lobby.id}) does not exist or has already been closed by the host.`
+          : errorMsg,
+        type: "error",
+      });
+
+      refreshLobbies();
+      throw err;
+    }
+  };
+
+  // 2b. Handle Joining by Lobby ID
+  const handleJoinById = async (lobbyId: number, password?: string) => {
+    try {
+      const lobby = await getLobbyById(lobbyId);
+      if (!lobby) {
+        throw new Error(`Lobby #${lobbyId} does not exist or has already been closed.`);
+      }
+
+      if (lobby.playersCount >= lobby.maxPlayers) {
+        throw new Error(`Lobby #${lobbyId} is already full.`);
+      }
+
+      await joinLobby(lobbyId, playerName, password);
+
+      setCurrentLobby({
+        id: lobby.id,
+        name: lobby.name,
+        createdBy: lobby.createdBy,
+        isPublic: lobby.isPublic,
+        hasPassword: lobby.hasPassword,
+        playersCount: lobby.playersCount + 1,
+        guestName: playerName,
+      });
+      setViewMode("lobby");
+      refreshLobbies();
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to join lobby";
+      const isNotExist =
+        errorMsg.toLowerCase().includes("not found") ||
+        errorMsg.toLowerCase().includes("not exist") ||
+        errorMsg.toLowerCase().includes("closed") ||
+        errorMsg.toLowerCase().includes("no longer active");
+
+      setLobbyAlert({
+        id: lobbyId,
+        title: isNotExist ? "Lobby Does Not Exist" : "Unable to Join Room",
+        message: isNotExist
+          ? `Lobby #${lobbyId} does not exist or has already been closed by the host.`
+          : errorMsg,
+        type: "error",
+      });
+
+      refreshLobbies();
+      throw err;
+    }
+  };
+
+  // 2c. Handle Joining from Chat Invite
+  const handleJoinLobbyFromChat = async (lobbyId: number, password?: string) => {
+    // If currently host of an empty lobby, clean up before joining the target lobby
+    if (currentLobby && currentLobby.id !== lobbyId) {
+      try {
+        await leaveLobby(currentLobby.id, playerName);
+      } catch (err) {
+        console.warn("Could not leave previous lobby", err);
+      }
+      setCurrentLobby(null);
+    }
+    await handleJoinById(lobbyId, password);
+  };
+
+  // 2d. Handle Challenging a Player from Chat
+  const handleChallengePlayer = async (targetUsername: string) => {
+    // If already in a lobby as host, send direct challenge to target
+    if (currentLobby && currentLobby.createdBy.toLowerCase() === playerName.toLowerCase()) {
+      const inviteMsg = formatLobbyInvite(
+        currentLobby.id,
+        currentLobby.name,
+        playerName,
+        targetUsername,
+        currentLobby.hasPassword
+      );
+      await postChat(playerName, inviteMsg, false, null);
+      setSentChallengeNotice({ targetUser: targetUsername, lobbyId: currentLobby.id });
+      return;
+    }
+
+    // If currently in another lobby, leave it first
+    if (currentLobby) {
+      try {
+        await leaveLobby(currentLobby.id, playerName);
+      } catch (err) {
+        console.warn("Could not leave previous lobby", err);
+      }
+      setCurrentLobby(null);
+    }
+
+    // Auto-create a lobby for the challenge
+    const roomName = `${playerName} vs ${targetUsername}`;
+    const result = await createLobby(roomName, true, playerName, false);
+    if (result) {
+      setCurrentLobby({
+        id: result.id,
+        name: result.name,
+        createdBy: playerName,
+        isPublic: true,
+        hasPassword: false,
+        playersCount: 1,
+        guestName: null,
+      });
+      setViewMode("lobby");
+      refreshLobbies();
+
+      const inviteMsg = formatLobbyInvite(result.id, result.name, playerName, targetUsername, false);
+      await postChat(playerName, inviteMsg, false, null);
+      setSentChallengeNotice({ targetUser: targetUsername, lobbyId: result.id });
+    }
+  };
+
+  // 2d-2. Handle Accepting Incoming Direct Challenge
+  const handleAcceptChallenge = async (lobbyId: number, password?: string) => {
+    await handleJoinLobbyFromChat(lobbyId, password);
+    setIncomingChallenge(null);
+  };
+
+  // 2d-3. Handle Declining Incoming Direct Challenge
+  const handleDeclineChallenge = () => {
+    setIncomingChallenge(null);
+  };
+
+  // 2e. Handle Broadcasting Lobby to Chat (from Lobby Room)
+  const handleInviteViaChat = async () => {
+    if (!currentLobby) return;
+    const inviteMsg = formatLobbyInvite(
+      currentLobby.id,
+      currentLobby.name,
+      playerName,
+      null,
+      currentLobby.hasPassword
+    );
+    await postChat(playerName, inviteMsg, false, null);
+    setIsChatOpen(true);
   };
 
   // 3. Handle Leaving Lobby
@@ -300,37 +490,11 @@ function App() {
   };
 
   // 5. Handle Mode Selection from Main Menu
-  const handleSelectMode = async (mode: "ai" | "online") => {
-    if (mode === "online") {
-      // Check if this player already has an active lobby (e.g. rejoining after lag or disconnect)
-      const currentList = await getLobby();
-      if (currentList) {
-        setLobbies(currentList);
-        const myLobby = currentList.find(
-          (l) => l.createdBy.toLowerCase() === playerName.toLowerCase()
-        );
-
-        if (myLobby) {
-          // Player already owns an active lobby! Reconnect to it and jump directly into the lobby view
-          await joinLobby(myLobby.id, playerName);
-          setCurrentLobby({
-            id: myLobby.id,
-            name: myLobby.name,
-            createdBy: myLobby.createdBy,
-            playersCount: myLobby.playersCount,
-            guestName: myLobby.playersCount >= 2 ? "Challenger" : null,
-          });
-          setViewMode("lobby");
-          return;
-        }
-      }
-
-      // No active lobby found: proceed to the standard Lobby Browser
-      setViewMode("online");
-      return;
-    }
-
+  const handleSelectMode = (mode: "ai" | "online") => {
     setViewMode(mode);
+    if (mode === "online") {
+      refreshLobbies();
+    }
   };
 
   return (
@@ -370,6 +534,8 @@ function App() {
               lobbies={lobbies}
               onCreateLobbyClick={() => setIsCreateModalOpen(true)}
               onJoinLobby={handleJoinLobby}
+              onJoinById={handleJoinById}
+              onRefresh={refreshLobbies}
             />
           </div>
         )}
@@ -382,6 +548,7 @@ function App() {
             messages={messages}
             onLeaveLobby={handleLeaveLobby}
             onStartGame={handleStartGame}
+            onInviteViaChat={() => void handleInviteViaChat()}
           />
         )}
 
@@ -481,12 +648,76 @@ function App() {
         )}
       </main>
 
+      {/* Direct Match Challenge Incoming Notification Popup */}
+      {incomingChallenge && (
+        <ChallengeNotificationPopup
+          invite={incomingChallenge}
+          onAccept={handleAcceptChallenge}
+          onDecline={handleDeclineChallenge}
+        />
+      )}
+
+      {/* Lobby Not Found / Error Alert Notification Popup */}
+      {lobbyAlert && (
+        <LobbyAlertPopup
+          alert={lobbyAlert}
+          onClose={() => setLobbyAlert(null)}
+        />
+      )}
+
+      {/* Challenger Sent Notification Toast */}
+      {sentChallengeNotice && (
+        <aside
+          aria-label="Direct challenge status notification"
+          className="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl border border-emerald-500/50 bg-slate-900/95 px-5 py-3 text-sm text-emerald-300 shadow-2xl shadow-black/80 backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-300 ring-1 ring-emerald-500/30"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-base shadow-sm">
+            ⚔️
+          </span>
+          <div>
+            <p className="font-bold text-white text-xs">Direct Challenge Sent!</p>
+            <p className="text-[11px] text-slate-300 mt-0.5">
+              Waiting for <span className="font-bold text-emerald-400">@{sentChallengeNotice.targetUser}</span> to accept...
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSentChallengeNotice(null)}
+            className="ml-2 flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
+            title="Dismiss"
+          >
+            ✕
+          </button>
+        </aside>
+      )}
+
       {/* Create Lobby Modal Popup */}
       <CreateLobbyModal
         isOpen={isCreateModalOpen}
         playerName={playerName}
         onClose={() => setIsCreateModalOpen(false)}
         onCreate={handleCreateLobby}
+      />
+
+      <ChatSidebar
+        playerName={playerName}
+        currentScreen={viewMode}
+        messages={chatMessages}
+        currentLobbyId={currentLobby?.id ?? (gameState ? parseInt(gameState.gameId, 10) || null : null)}
+        isAiGame={
+          currentLobby?.guestName === "Greedy AI" ||
+          gameState?.whitePlayerName === "Greedy AI" ||
+          gameState?.blackPlayerName === "Greedy AI" ||
+          viewMode === "ai"
+        }
+        isOpenControlled={isChatOpen}
+        onToggleOpen={setIsChatOpen}
+        onJoinLobbyFromChat={handleJoinLobbyFromChat}
+        onChallengePlayer={handleChallengePlayer}
+        onSendMessage={async (msg, channel) => {
+          const activeLobbyId = currentLobby?.id ?? (gameState ? parseInt(gameState.gameId, 10) || null : null);
+          await postChat(playerName, msg, channel === "lobby", activeLobbyId);
+        }}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Othello.Api.Endpoints;
 using Othello.Api.Hubs;
+using Othello.Api.Models;
 using Othello.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +27,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddSingleton<ConcurrentDictionary<int, Lobby>>();
+builder.Services.AddSingleton<List<IChat>>();
 
 var app = builder.Build();
 

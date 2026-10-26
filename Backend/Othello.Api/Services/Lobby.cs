@@ -12,6 +12,7 @@ public class Lobby
     public int Id { get; private set; }
     public string Name { get; private set; }
     public bool IsPublic { get; set; }
+    public string? Password { get; set; }
 
     private readonly List<IPlayer> _players = new List<IPlayer>();
 
@@ -30,7 +31,7 @@ public class Lobby
     public DateTime CreatedAt { get; private set; }
     public GameManager? Game { get; private set; }
 
-    public Lobby(int id, IPlayer player, string name, bool isPublic)
+    public Lobby(int id, IPlayer player, string name, bool isPublic, string? password = null)
     {
         Id = id;
         Name = name;
@@ -42,6 +43,13 @@ public class Lobby
         }
         CreatedAt = DateTime.UtcNow;
         IsPublic = isPublic;
+        Password = string.IsNullOrWhiteSpace(password) ? null : password.Trim();
+    }
+
+    public bool VerifyPassword(string? inputPassword)
+    {
+        if (string.IsNullOrEmpty(Password)) return true;
+        return string.Equals(Password, inputPassword?.Trim());
     }
 
     public bool Join(IPlayer player)

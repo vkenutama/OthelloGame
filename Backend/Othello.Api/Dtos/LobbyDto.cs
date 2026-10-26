@@ -1,4 +1,4 @@
-﻿using Othello.Domain;
+using Othello.Domain;
 using Othello.Domain.Interfaces;
 
 namespace Othello.Api.Dtos;
@@ -9,6 +9,7 @@ public record CreateLobbyDto
     public bool IsPublic { get; init; } = false;
     public HumanPlayer Player { get; init; } = null!;
     public bool IsAiGame { get; init; } = false;
+    public string? Password { get; init; } = null;
 }
 
 public record LeaveLobbyDto
@@ -27,6 +28,7 @@ public record JoinLobbyDto
 {
     public int LobbyId { get; set; }
     public HumanPlayer Player { get; set; } = null!;
+    public string? Password { get; init; } = null;
 }
 
 public record StartGameDto
@@ -42,4 +44,8 @@ public record GetLobbyDetailsDto
     public string CreatedBy { get; set; } = string.Empty;
     public int PlayersCount { get; set; }
     public int MaxPlayers { get; private set; } = 2;
+    public bool HasPassword { get; set; } = false;
+    public bool IsPublic { get; set; } = true;
+
+    public List<IPlayer>? Players { get; set; }
 }

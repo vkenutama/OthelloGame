@@ -11,4 +11,5 @@ public interface IGameClient
     Task ErrorMessage(string message);
     Task ReceiveBroadcast(string message);
     Task LobbyDeleted(string message);
+    Task ReceiveChat(ReceiveChatDto chat);
 }

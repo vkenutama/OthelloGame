@@ -4,7 +4,7 @@ interface CreateLobbyModalProps {
   isOpen: boolean;
   playerName: string;
   onClose: () => void;
-  onCreate: (name: string, isPublic: boolean) => Promise<void>;
+  onCreate: (name: string, isPublic: boolean, password?: string) => Promise<void>;
 }
 
 export function CreateLobbyModal({
@@ -15,17 +15,33 @@ export function CreateLobbyModal({
 }: CreateLobbyModalProps) {
   const [lobbyName, setLobbyName] = useState(`${playerName}'s Match`);
   const [isPublic, setIsPublic] = useState(true);
+  const [hasPassword, setHasPassword] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Automatically sync lobbyName and state whenever the modal opens or playerName updates
+  // Automatically sync state whenever modal opens
   useEffect(() => {
     if (isOpen) {
       setLobbyName(`${playerName}'s Match`);
+      setIsPublic(true);
+      setHasPassword(false);
+      setPassword("");
+      setShowPassword(false);
       setErrorMsg(null);
       setIsLoading(false);
     }
   }, [isOpen, playerName]);
+
+  // If user unchecks Public (sets Private), recommend password protection
+  const handleTogglePublic = () => {
+    const nextPublic = !isPublic;
+    setIsPublic(nextPublic);
+    if (!nextPublic) {
+      setHasPassword(true);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -37,10 +53,16 @@ export function CreateLobbyModal({
       return;
     }
 
+    if (hasPassword && !password.trim()) {
+      setErrorMsg("Please enter a password or disable password protection.");
+      return;
+    }
+
     try {
       setIsLoading(true);
       setErrorMsg(null);
-      await onCreate(trimmed, isPublic);
+      const roomPassword = hasPassword && password.trim() ? password.trim() : undefined;
+      await onCreate(trimmed, isPublic, roomPassword);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create lobby";
       setErrorMsg(message);
@@ -70,9 +92,10 @@ export function CreateLobbyModal({
             </div>
           </div>
           <button
+            type="button"
             disabled={isLoading}
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
           >
             ✕
           </button>
@@ -87,7 +110,7 @@ export function CreateLobbyModal({
         )}
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="mt-5 space-y-5">
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           {/* 1. Room Name Input */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
@@ -118,13 +141,17 @@ export function CreateLobbyModal({
           <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3">
             <div>
               <p className="text-sm font-medium text-white">Public Room</p>
-              <p className="text-xs text-slate-400">Allow players in lobby browser to see and join</p>
+              <p className="text-xs text-slate-400">
+                {isPublic
+                  ? "Visible in Lobby Browser list"
+                  : "Hidden from list (Join by Lobby ID only)"}
+              </p>
             </div>
             <button
               type="button"
               disabled={isLoading}
-              onClick={() => setIsPublic(!isPublic)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              onClick={handleTogglePublic}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
                 isPublic ? "bg-emerald-600" : "bg-slate-700"
               }`}
             >
@@ -136,20 +163,70 @@ export function CreateLobbyModal({
             </button>
           </div>
 
+          {/* 4. Password Protection Toggle */}
+          <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🔒</span>
+                <div>
+                  <p className="text-sm font-medium text-white">Password Protection</p>
+                  <p className="text-xs text-slate-400">Require PIN or password to enter</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => setHasPassword(!hasPassword)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                  hasPassword ? "bg-emerald-600" : "bg-slate-700"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    hasPassword ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Password Input (shown when hasPassword is true) */}
+            {hasPassword && (
+              <div className="relative pt-1 animate-fade-in">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter room password..."
+                  maxLength={20}
+                  disabled={isLoading}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-white placeholder-slate-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-white transition-colors cursor-pointer text-xs font-semibold"
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "🙈" : "👁️"}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Modal Actions */}
           <div className="flex items-center justify-end gap-3 pt-3">
             <button
               type="button"
               disabled={isLoading}
               onClick={onClose}
-              className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
+              className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-950/50 transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-950/50 transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
