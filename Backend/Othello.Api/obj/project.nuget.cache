@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "qriY1YKxTYU=",
+  "dgSpecHash": "6o2zI8raoWM=",
   "success": true,
-  "projectFilePath": "E:\\Formulatrix\\Bootcamp\\Individual Project\\Othello Game\\Backend\\Othello.Api\\Othello.Api.csproj",
+  "projectFilePath": "E:\\Formulatrix\\Bootcamp\\Individual Project\\Othello2\\OthelloGame\\Backend\\Othello.Api\\Othello.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\vince\\.nuget\\packages\\microsoft.aspnetcore.openapi\\8.0.31\\microsoft.aspnetcore.openapi.8.0.31.nupkg.sha512",
     "C:\\Users\\vince\\.nuget\\packages\\microsoft.extensions.apidescription.server\\6.0.5\\microsoft.extensions.apidescription.server.6.0.5.nupkg.sha512",

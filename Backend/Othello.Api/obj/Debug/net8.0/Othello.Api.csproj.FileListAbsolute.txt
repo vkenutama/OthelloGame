@@ -37,3 +37,42 @@ E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Api\obj\
 E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.pdb
 E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.genruntimeconfig.cache
 E:\Formulatrix\Bootcamp\Individual Project\Othello Game\Backend\Othello.Api\obj\Debug\net8.0\ref\Othello.Api.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\appsettings.Development.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\appsettings.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Othello.Api.staticwebassets.endpoints.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Othello.Api.exe
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Othello.Api.deps.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Othello.Api.runtimeconfig.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Othello.Api.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Othello.Api.pdb
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Microsoft.AspNetCore.OpenApi.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Microsoft.OpenApi.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Swashbuckle.AspNetCore.Swagger.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Othello.Domain.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\bin\Debug\net8.0\Othello.Domain.pdb
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.csproj.AssemblyReference.cache
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\rpswa.dswa.cache.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.GeneratedMSBuildEditorConfig.editorconfig
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.AssemblyInfoInputs.cache
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.AssemblyInfo.cs
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.csproj.CoreCompileInputs.cache
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.MvcApplicationPartsAssemblyInfo.cs
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.MvcApplicationPartsAssemblyInfo.cache
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.sourcelink.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\rjimswa.dswa.cache.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\rjsmrazor.dswa.cache.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\rjsmcshtml.dswa.cache.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\scopedcss\bundle\Othello.Api.styles.css
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\staticwebassets.build.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\staticwebassets.build.json.cache
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\staticwebassets.development.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\staticwebassets.build.endpoints.json
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\swae.build.ex.cache
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello..7464C067.Up2Date
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\refint\Othello.Api.dll
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.pdb
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\Othello.Api.genruntimeconfig.cache
+E:\Formulatrix\Bootcamp\Individual Project\Othello2\OthelloGame\Backend\Othello.Api\obj\Debug\net8.0\ref\Othello.Api.dll
