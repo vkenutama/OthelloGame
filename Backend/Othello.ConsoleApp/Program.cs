@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Othello.Domain;
 using Othello.Domain.Interfaces;
 using Spectre.Console;
@@ -9,7 +6,7 @@ namespace Othello.ConsoleApp;
 
 class Program
 {
-    static void Main(string[] args)
+    static void Main()
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
@@ -95,7 +92,7 @@ class Program
         {
             RenderGameState(game, eventLogs);
 
-            var validMoves = game.GetValidMoves() ?? new List<Position>();
+            var validMoves = game.GetValidMoves();
             if (validMoves.Count == 0)
             {
                 AnsiConsole.MarkupLine(
@@ -160,7 +157,7 @@ class Program
         var currentTurn = game.CurrentTurn;
         var currentPlayer = game.GetPlayer(currentTurn);
         var score = game.GetScore();
-        var validMoves = game.GetValidMoves() ?? new List<Position>();
+        var validMoves = game.GetValidMoves();
 
         // Board Table
         var boardTable = CreateBoardTable(game.Board, validMoves);

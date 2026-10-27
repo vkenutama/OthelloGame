@@ -10,10 +10,4 @@ public class Chat : IChat
     /// If null, this chat belong to global chat
     /// </summary>
     public int? LobbyId { get; set; }
-
-    public Chat()
-    {
-        
-    }
-
 }
