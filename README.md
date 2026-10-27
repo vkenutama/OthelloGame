@@ -56,42 +56,6 @@ A modern, full-stack implementation of the classic strategy board game **Othello
 
 ### 💻 5. Console Client (`Othello.ConsoleApp`)
 - Interactive CLI client providing full terminal-based Othello gameplay for human-vs-human and human-vs-AI modes.
-
----
-
-## 📐 System Architecture
-
-```mermaid
-flowchart TD
-    subgraph Client Layer
-        Web["Web Client (React + Vite + TS)"]
-        CLI["Terminal Client (ConsoleApp)"]
-    end
-
-    subgraph API Layer ["ASP.NET Core Web API & SignalR"]
-        Controller["LobbyController (REST API)"]
-        Service["LobbyService (Service Result Pattern)"]
-        Hub["OthelloHub (SignalR WebSockets)"]
-    end
-
-    subgraph Core Domain ["Othello.Domain"]
-        GM["GameManager"]
-        Board["Board & Cells (8x8)"]
-        AI["GreedyAI / RandomAI"]
-        Rules["Move Validation & Flip Rules"]
-    end
-
-    Web -->|"HTTP REST"| Controller
-    Controller --> Service
-    Service -->|"Read Lobby Data"| Hub
-    Web <-->|"WebSockets (Bidirectional)"| Hub
-    CLI --> GM
-    Hub --> GM
-    GM --> Board
-    GM --> AI
-    GM --> Rules
-```
-
 ---
 
 ## 📁 Project Structure
