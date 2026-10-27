@@ -1,6 +1,6 @@
 namespace Othello.Domain;
 
-public record Move()
+public record Move
 {
     public Position Target { get; set; }
     public PieceColor Color { get; set; }

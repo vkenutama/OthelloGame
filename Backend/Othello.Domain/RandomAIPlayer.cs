@@ -2,6 +2,7 @@ using Othello.Domain.Interfaces;
 
 namespace Othello.Domain;
 
+// ReSharper disable once InconsistentNaming
 public class RandomAIPlayer : IAutoPlayer
 {
     private readonly Random _random = new Random();

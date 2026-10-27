@@ -1,5 +1,4 @@
-﻿using System.Drawing;
-using Othello.Domain.Interfaces;
+﻿using Othello.Domain.Interfaces;
 
 namespace Othello.Domain.Utils;
 

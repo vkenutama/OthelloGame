@@ -9,26 +9,24 @@ namespace Othello.Api.Controllers;
 [Route("api/[controller]")]
 public class LobbyController(ILobbyService lobbyService) : ControllerBase
 {
-    private readonly ILobbyService _lobbyService = lobbyService;
-
     [HttpGet]
     public ActionResult<List<GetLobbyDetailsDto>> GetPublicLobbies()
     {
-        var result = _lobbyService.GetPublicLobbies();
+        var result = lobbyService.GetPublicLobbies();
         return result.ToActionResult();
     }
 
     [HttpGet("{id:int}")]
     public ActionResult<GetLobbyDetailsDto> GetLobbyById(int id)
     {
-        var result = _lobbyService.GetLobbyById(id);
+        var result = lobbyService.GetLobbyById(id);
         return result.ToActionResult();
     }
 
     [HttpGet("player/{playerName}")]
     public ActionResult<GetLobbyDetailsDto> GetLobbyByPlayerName(string playerName)
     {
-        var result = _lobbyService.GetLobbyByPlayerName(playerName);
+        var result = lobbyService.GetLobbyByPlayerName(playerName);
         return result.ToActionResult();
     }
 }

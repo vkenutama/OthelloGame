@@ -31,14 +31,12 @@ public class OthelloHub(
 
     private record DisconnectionTimeoutState(
         string DisconnectedPlayerName,
-        CancellationTokenSource Cts,
-        DateTime DisconnectedAt
+        CancellationTokenSource Cts
     );
 
     private static readonly ConcurrentDictionary<int, DisconnectionTimeoutState> DisconnectionTimeouts = new();
 
-    private int LobbyCount() => _lobbies.Count;
-    private static int _lobbyId = 0;
+    private static int _lobbyId;
 
     #region Lobby
 
@@ -55,7 +53,7 @@ public class OthelloHub(
 
     public async Task CreateLobby(CreateLobbyDto dto)
     {
-        if (dto.Player == null || string.IsNullOrWhiteSpace(dto.Player.Name))
+        if (string.IsNullOrWhiteSpace(dto.Player.Name))
         {
             await Clients.Caller.ErrorMessage("Invalid player information");
             return;
@@ -247,7 +245,7 @@ public class OthelloHub(
 
     public async Task JoinLobby(JoinLobbyDto dto)
     {
-        if (dto.Player == null || string.IsNullOrWhiteSpace(dto.Player.Name))
+        if (string.IsNullOrWhiteSpace(dto.Player.Name))
         {
             await Clients.Caller.ErrorMessage("Invalid player information");
             return;
@@ -326,10 +324,10 @@ public class OthelloHub(
         }
 
         LobbyPlayersConnections.AddOrUpdate(dto.Player.Name, Context.ConnectionId, (_, _) => Context.ConnectionId);
-        await Groups.AddToGroupAsync(Context.ConnectionId, lobbyGroupId!);
+        await Groups.AddToGroupAsync(Context.ConnectionId, lobbyGroupId);
 
         // Broadcast directly to the room
-        await Clients.Group(lobbyGroupId!).ReceiveBroadcast($"Player {dto.Player.Name} joined lobby {lobby.Name}!");
+        await Clients.Group(lobbyGroupId).ReceiveBroadcast($"Player {dto.Player.Name} joined lobby {lobby.Name}!");
     }
 
     public async Task GetMyLobby(string username)
@@ -460,7 +458,6 @@ public class OthelloHub(
         if (!result.IsSuccess)
         {
             await Clients.Caller.ErrorMessage($"Invalid move: {result.Failure}");
-            return;
         }
     }
 
@@ -577,7 +574,7 @@ public class OthelloHub(
         }
 
         var cts = new CancellationTokenSource();
-        var timeoutState = new DisconnectionTimeoutState(playerName, cts, DateTime.UtcNow);
+        var timeoutState = new DisconnectionTimeoutState(playerName, cts);
         DisconnectionTimeouts[lobby.Id] = timeoutState;
 
         const int timeoutSeconds = 30;
