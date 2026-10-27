@@ -1,2 +1,2 @@
 Basic othello game
-![gameplay.png]()
+![./gameplay.png]()
