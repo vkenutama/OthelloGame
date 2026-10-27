@@ -1,4 +1,4 @@
-# 🎮 Othello
+# 🎮 Othello – Real-Time Multiplayer & AI Platform
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![ASP.NET Core](https://img.shields.io/badge/ASP.NET_Core-SignalR-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/aspnet/core/signalr/)
@@ -7,7 +7,7 @@
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 
-A modern, full-stack implementation of the classic strategy board game **Othello**. Features real-time online multiplayer over WebSockets (SignalR), interactive lobby management, direct player-to-player challenges, live chat, single-player mode against an AI, and an interactive terminal console client.
+A modern, full-stack implementation of the classic strategy board game **Othello**. Features real-time online multiplayer over WebSockets (SignalR), interactive lobby management, direct player-to-player challenges, live chat, single-player mode against an intelligent heuristic AI, and an interactive terminal console client.
 
 ---
 
@@ -17,16 +17,16 @@ A modern, full-stack implementation of the classic strategy board game **Othello
 
 ---
 
-## Key Features
+## 🌟 Key Features
 
-### 1. Pure Domain Game Engine (`Othello.Domain`)
+### 🧠 1. Pure Domain Game Engine (`Othello.Domain`)
 - **Official Othello Rules**: Full 8x8 grid mechanics with directional bracket raycasting in all 8 directions (horizontal, vertical, diagonal).
 - **Turn & Score Management**: Automatic calculation of valid moves, turn skipping when no legal moves exist, dynamic score updates, and game over detection.
 - **Modular AI Opponents**:
   - `GreedyAIPlayer`: Evaluates board states and selects the move yielding the highest flip count.
   - `RandomAIPlayer`: Makes stochastic valid moves for casual play.
 
-### 2. Real-Time Multiplayer & SignalR Hub (`Othello.Api`)
+### ⚡ 2. Real-Time Multiplayer & SignalR Hub (`Othello.Api`)
 - **Real-Time WebSocket Synchronization**: Sub-millisecond state broadcasts powered by ASP.NET Core SignalR (`OthelloHub`).
 - **Lobby Management & Matchmaking**:
   - Public & password-protected private lobbies.
@@ -42,19 +42,19 @@ A modern, full-stack implementation of the classic strategy board game **Othello
   - Live online player counter and presence list.
   - **1-Click Direct Challenges**: Challenge online players directly from chat with interactive challenge notification popups.
 
-### 3. Backend Architecture & Service Result Pattern
+### 🏛️ 3. Backend Architecture & Service Result Pattern
 - **Controller-Based REST API**: Migrated from Minimal APIs to clean, maintainable ASP.NET Core Controllers (`LobbyController`).
 - **Service Result Pattern**: Clean separation of HTTP concerns from business logic via `ServiceResult<T>`, `ServiceErrorType`, and `ILobbyService`.
 - **CORS & Resilience**: Configured for local development and multi-client environments with automatic reconnection resilience.
 
-### 4. Modern Cyber Glassmorphism UI (`Frontend`)
+### 🎨 4. Modern Cyber Glassmorphism UI (`Frontend`)
 - **Tech Stack**: React 19, TypeScript, Vite, Tailwind CSS v4.
 - **Selectable AI Opponents**: Interactive engine picker supporting tactical Greedy AI (🤖) and casual Random AI (🎲) with distinct themes.
 - **Visual Feedback**: Ambient particle effects, glowing active turn indicators, valid move markers with hover previews, and celebratory game over modals.
 - **Responsive Layout**: Designed for seamless experience on desktop and mobile viewports.
 - **Session Continuity**: Browser tab isolation via `sessionStorage` allowing multiple local player identities for side-by-side testing.
 
-### 5. Console Client (`Othello.ConsoleApp`)
+### 💻 5. Console Client (`Othello.ConsoleApp`)
 - Interactive CLI client providing full terminal-based Othello gameplay for human-vs-human and human-vs-AI modes.
 
 ---
@@ -81,10 +81,10 @@ flowchart TD
         Rules["Move Validation & Flip Rules"]
     end
 
-    Web -->|HTTP REST| Controller
+    Web -->|"HTTP REST"| Controller
     Controller --> Service
-    Service -->|Read Lobby Data| Hub
-    Web <-->|WebSockets (Bidirectional)| Hub
+    Service -->|"Read Lobby Data"| Hub
+    Web <-->|"WebSockets (Bidirectional)"| Hub
     CLI --> GM
     Hub --> GM
     GM --> Board
@@ -219,7 +219,7 @@ All endpoints implement the **Service Result Pattern** returning standardized re
 
 ### SignalR WebSocket Hub (`/othello/hub`)
 
-#### Client Invocations (Client $\rightarrow$ Server)
+#### Client Invocations (Client → Server)
 - `CreateLobby(CreateLobbyDto dto)`: Creates a new waiting room or AI match session.
 - `JoinLobby(JoinLobbyDto dto)`: Joins an existing room or reconnects an existing session.
 - `LeaveLobby(LeaveLobbyDto dto)`: Leaves a waiting room or forfeits an active match.
@@ -228,7 +228,7 @@ All endpoints implement the **Service Result Pattern** returning standardized re
 - `PostChat(SendChatDto dto)`: Sends a message to global or room chat.
 - `GetOnlinePlayersCount()`: Requests current server-wide connected player count.
 
-#### Server Broadcasts (Server $\rightarrow$ Client)
+#### Server Broadcasts (Server → Client)
 - `ReceiveGameState(GameStateDto state)`: Emits board matrix (8x8), valid moves, scores, turn, and game status.
 - `MovePlayed(MoveResultDto move)`: Notifies clients of the move location and flipped piece count.
 - `GameOver(string result, int blackScore, int whiteScore)`: Broadcasts game termination and winner.
