@@ -11,11 +11,13 @@ interface ChatSidebarProps {
     messages: ChatMessageItem[];
     currentLobbyId?: number | null;
     isAiGame?: boolean;
+    onlinePlayersCount: number
     onSendMessage?: (message: string, channel: ChatChannel) => void | Promise<void>;
     onJoinLobbyFromChat?: (lobbyId: number, password?: string) => Promise<void>;
     onChallengePlayer?: (targetUsername: string) => Promise<void>;
     isOpenControlled?: boolean;
     onToggleOpen?: (open: boolean) => void;
+    getOnlinePlayersCount: () => void;
 }
 
 export function ChatSidebar({
@@ -28,13 +30,20 @@ export function ChatSidebar({
     onJoinLobbyFromChat,
     onChallengePlayer,
     isOpenControlled,
-    onToggleOpen
+    onToggleOpen,
+    onlinePlayersCount,
+    getOnlinePlayersCount
 }: ChatSidebarProps) {
     const [internalIsOpen, setInternalIsOpen] = useState(false);
     const isOpen = isOpenControlled !== undefined ? isOpenControlled : internalIsOpen;
     const setIsOpen = (val: boolean | ((prev: boolean) => boolean)) => {
         const next = typeof val === "function" ? val(isOpen) : val;
         setInternalIsOpen(next);
+
+        if (next) {
+            void getOnlinePlayersCount();
+        }
+
         onToggleOpen?.(next);
     };
 
@@ -67,9 +76,10 @@ export function ChatSidebar({
             } else {
                 setActiveChannel("global");
             }
+            void getOnlinePlayersCount();
         }
         prevIsOpenRef.current = isOpen;
-    }, [isOpen, isLobbyOrGameplay]);
+    }, [isOpen, isLobbyOrGameplay, getOnlinePlayersCount]);
 
     // If leaving lobby/gameplay while in lobby chat, auto-fallback to global chat
     useEffect(() => {
@@ -238,11 +248,10 @@ export function ChatSidebar({
                 ref={triggerBtnRef}
                 type="button"
                 onClick={handleToggleOpen}
-                className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center gap-2 rounded-l-2xl border border-r-0 border-slate-700/70 bg-slate-900/80 px-3.5 py-3 text-slate-300 shadow-xl backdrop-blur-xl transition-all duration-300 hover:border-emerald-500/50 hover:bg-slate-800 hover:text-emerald-400 cursor-pointer ${
-                    isOpen
+                className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center gap-2 rounded-l-2xl border border-r-0 border-slate-700/70 bg-slate-900/80 px-3.5 py-3 text-slate-300 shadow-xl backdrop-blur-xl transition-all duration-300 hover:border-emerald-500/50 hover:bg-slate-800 hover:text-emerald-400 cursor-pointer ${isOpen
                         ? "translate-x-full pointer-events-none opacity-0"
                         : "translate-x-0 opacity-100"
-                }`}
+                    }`}
                 title={isOpen ? "Close Chat" : "Open Live Chat"}
             >
                 <div className="relative flex items-center justify-center">
@@ -274,11 +283,10 @@ export function ChatSidebar({
             {/* 2. Floating Translucent Partial-Height Chat Card */}
             <aside
                 ref={asideRef}
-                className={`fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-50 flex h-[520px] max-h-[80vh] w-[calc(100vw-1.5rem)] sm:w-96 flex-col rounded-3xl border border-slate-700/60 bg-slate-900/90 backdrop-blur-2xl shadow-2xl shadow-black/80 transition-all duration-300 ease-out overflow-hidden ${
-                    isOpen
+                className={`fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-50 flex h-[520px] max-h-[80vh] w-[calc(100vw-1.5rem)] sm:w-96 flex-col rounded-3xl border border-slate-700/60 bg-slate-900/90 backdrop-blur-2xl shadow-2xl shadow-black/80 transition-all duration-300 ease-out overflow-hidden ${isOpen
                         ? "translate-x-0 opacity-100 pointer-events-auto"
                         : "translate-x-[120%] opacity-0 pointer-events-none"
-                }`}
+                    }`}
             >
                 {/* Subtle Ambient Glow inside glass */}
                 <div className="pointer-events-none absolute -top-12 -right-12 h-36 w-36 rounded-full bg-emerald-500/10 blur-2xl" />
@@ -307,10 +315,10 @@ export function ChatSidebar({
                                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                 <span className="text-[10px] text-slate-400 font-medium">
                                     {activeChannel === "global"
-                                        ? "Global Broadcast"
+                                        ? `${Math.max(1, onlinePlayersCount)} ${Math.max(1, onlinePlayersCount) === 1 ? "player" : "players"} online`
                                         : currentScreen === "in_game"
-                                        ? "Match Channel"
-                                        : "Lobby Channel"}
+                                            ? "Match Channel"
+                                            : "Lobby Channel"}
                                 </span>
                             </div>
                         </div>
@@ -350,14 +358,16 @@ export function ChatSidebar({
                         <button
                             type="button"
                             onClick={() => setActiveChannel("global")}
-                            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
-                                activeChannel === "global"
+                            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${activeChannel === "global"
                                     ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-950/50"
                                     : "text-slate-400 hover:text-slate-200 border border-transparent"
-                            }`}
+                                }`}
                         >
                             <span className="text-xs">🌐</span>
                             <span>Global</span>
+                            <span className="ml-0.5 rounded-full bg-emerald-500/20 px-1.5 py-0.2 text-[9px] font-bold text-emerald-400">
+                                {Math.max(1, onlinePlayersCount)}
+                            </span>
                         </button>
 
                         {/* Lobby Chat Tab - Only visible when current screen IS lobby or gameplay */}
@@ -365,11 +375,10 @@ export function ChatSidebar({
                             <button
                                 type="button"
                                 onClick={() => setActiveChannel("lobby")}
-                                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
-                                    activeChannel === "lobby"
+                                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${activeChannel === "lobby"
                                         ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-950/50"
                                         : "text-slate-400 hover:text-slate-200 border border-transparent"
-                                }`}
+                                    }`}
                             >
                                 <span className="text-xs">{currentScreen === "in_game" ? "⚔️" : "👥"}</span>
                                 <span>Lobby</span>
@@ -384,8 +393,8 @@ export function ChatSidebar({
                         {activeChannel === "global"
                             ? "All Players"
                             : currentScreen === "in_game"
-                            ? "Current Match"
-                            : "Waiting Room"}
+                                ? "Current Match"
+                                : "Waiting Room"}
                     </span>
                 </div>
 
@@ -420,15 +429,15 @@ export function ChatSidebar({
                                 {activeChannel === "global"
                                     ? "Global Chat"
                                     : currentScreen === "in_game"
-                                    ? "Match Chat"
-                                    : "Lobby Chat"}
+                                        ? "Match Chat"
+                                        : "Lobby Chat"}
                             </p>
                             <p className="text-xs text-slate-400/80 mt-1 max-w-[220px]">
                                 {activeChannel === "global"
                                     ? "No messages yet. Send a greeting to everyone online!"
                                     : currentScreen === "in_game"
-                                    ? "No match chat yet. Say good luck to your opponent!"
-                                    : "No lobby chat yet. Plan your match strategy here!"}
+                                        ? "No match chat yet. Say good luck to your opponent!"
+                                        : "No lobby chat yet. Plan your match strategy here!"}
                             </p>
                         </div>
                     ) : (
@@ -520,9 +529,8 @@ export function ChatSidebar({
                                     >
                                         <div className="flex items-center gap-1.5 mb-1 px-1">
                                             <span
-                                                className={`text-[10px] font-semibold ${
-                                                    isSelf ? "text-emerald-400" : "text-cyan-400"
-                                                }`}
+                                                className={`text-[10px] font-semibold ${isSelf ? "text-emerald-400" : "text-cyan-400"
+                                                    }`}
                                             >
                                                 {isSelf ? "You" : msg.username}
                                             </span>
@@ -545,11 +553,10 @@ export function ChatSidebar({
                                             </span>
                                         </div>
                                         <div
-                                            className={`rounded-2xl px-3.5 py-2 text-xs leading-relaxed max-w-[85%] break-words shadow-sm ${
-                                                isSelf
+                                            className={`rounded-2xl px-3.5 py-2 text-xs leading-relaxed max-w-[85%] break-words shadow-sm ${isSelf
                                                     ? "bg-emerald-600/30 border border-emerald-500/40 text-emerald-100 rounded-tr-none"
                                                     : "bg-slate-800/80 border border-slate-700/60 text-slate-200 rounded-tl-none"
-                                            }`}
+                                                }`}
                                         >
                                             {msg.message}
                                         </div>
@@ -621,8 +628,8 @@ export function ChatSidebar({
                                 activeChannel === "global"
                                     ? "Type a global message..."
                                     : currentScreen === "in_game"
-                                    ? "Type to match opponent..."
-                                    : "Type to lobby players..."
+                                        ? "Type to match opponent..."
+                                        : "Type to lobby players..."
                             }
                             disabled={isSending}
                             className="flex-1 rounded-xl border border-slate-700/60 bg-slate-900/60 px-3.5 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-emerald-500/60 transition-colors backdrop-blur-sm disabled:opacity-50"

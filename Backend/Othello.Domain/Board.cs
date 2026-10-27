@@ -4,10 +4,7 @@ namespace Othello.Domain;
 
 public class Board : IBoard
 {
-    public int Size
-    {
-        get => Cells.Length;
-    }
+    public int Size => Cells.Length;
 
     public ICell[,] Cells { get; set; }
 

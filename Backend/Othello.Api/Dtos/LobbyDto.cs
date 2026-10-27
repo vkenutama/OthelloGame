@@ -20,6 +20,11 @@ public record LeaveLobbyDto
 
 public record DeleteLobbyDto
 {
+    public DeleteLobbyDto(int lobbyId)
+    {
+        LobbyId = lobbyId;
+    }
+
     public int LobbyId { get; set; }
     public string PlayerUsername { get; set; } = string.Empty;
 }
@@ -33,6 +38,11 @@ public record JoinLobbyDto
 
 public record StartGameDto
 {
+    public StartGameDto(int lobbyId)
+    {
+        LobbyId = lobbyId;
+    }
+
     public int LobbyId { get; set; }
     public string PlayerUsername { get; set; } = null!;
 }

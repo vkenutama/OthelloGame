@@ -34,8 +34,8 @@ export function LobbyBrowser({
 
     const filteredLobbies = lobbies?.filter(
         (lobby) =>
-            lobby.name.toLowerCase().includes(searchQuery.toLocaleLowerCase()) ||
-            lobby.createdBy.toLowerCase().includes(searchQuery.toLocaleLowerCase())
+            (lobby.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (lobby.createdBy || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     const handleJoinClick = async (lobby: GetLobbyDetailsDto) => {

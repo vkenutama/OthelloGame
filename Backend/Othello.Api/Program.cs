@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using Othello.Api.Endpoints;
 using Othello.Api.Hubs;
 using Othello.Api.Models;
 using Othello.Api.Services;
@@ -7,10 +6,7 @@ using Othello.Api.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-// builder.Services.AddEndpointsApiExplorer();
-// builder.Services.AddSwaggerGen();
-
+builder.Services.AddControllers();
 builder.Services.AddSignalR();
 
 const string corsPolicyName = "OthelloClient";
@@ -28,22 +24,15 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddSingleton<ConcurrentDictionary<int, Lobby>>();
 builder.Services.AddSingleton<List<IChat>>();
+builder.Services.AddScoped<ILobbyService, LobbyService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-// if (app.Environment.IsDevelopment())
-// {
-//     app.UseSwagger();
-//     app.UseSwaggerUI();
-// }
-
 app.UseCors(corsPolicyName);
 
-// Map the SignalR hub endpoint URL
+// Map controllers & SignalR hub endpoint
+app.MapControllers();
 app.MapHub<OthelloHub>("/othello/hub");
-app.MapLobbyEndpoint();
-
 
 app.UseHttpsRedirection();
 

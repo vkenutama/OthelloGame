@@ -8,7 +8,7 @@ namespace Othello.Api.Services;
 
 public class Lobby
 {
-    public const int MaxPlayers = 2;
+    private const int MaxPlayers = 2;
     public int Id { get; private set; }
     public string Name { get; private set; }
     public bool IsPublic { get; set; }
@@ -98,8 +98,19 @@ public class Lobby
             p1 = _players[0];
             p2 = _players[1];
         }
+        
 
-        GameManager game = new GameManager(p1, p2);
+        Board board = new Board();
+        Piece blackPiece = new Piece
+        {
+            Color = PieceColor.Black
+        };
+        
+        Piece whitePiece = new Piece
+        {
+            Color = PieceColor.White
+        };
+        GameManager game = new GameManager(p1, p2, board, blackPiece, whitePiece);
         Game = game;
 
         if (hubContext != null)

@@ -5,8 +5,8 @@ namespace Othello.Domain;
 public class GameManager
 {
     public IBoard Board { get; private set; }
-    public PieceColor CurrentTurn { get; set; }
-    public GameResult? Result { get; set; }
+    public PieceColor CurrentTurn { get; private set; }
+    public GameResult? Result { get; private set; }
     private readonly IPlayer _blackPlayer;
     private readonly IPlayer _whitePlayer;
     private readonly IPiece _blackPiece;
@@ -14,16 +14,16 @@ public class GameManager
     private bool _isStarted;
     private bool _isProcessing;
 
-    private static readonly IReadOnlyList<Direction> _directions = new List<Direction>
+    private static readonly IReadOnlyList<Position> Directions = new List<Position>
     {
-        new Direction { DRow = -1, DCol = 0 },
-        new Direction { DRow = 1, DCol = 0 },
-        new Direction { DRow = 0, DCol = -1 },
-        new Direction { DRow = 0, DCol = 1 },
-        new Direction { DRow = -1, DCol = -1 },
-        new Direction { DRow = -1, DCol = 1 },
-        new Direction { DRow = 1, DCol = -1 },
-        new Direction { DRow = 1, DCol = 1 }
+        new() { Row = -1, Col = 0 },
+        new() { Row = 1, Col = 0 },
+        new() { Row = 0, Col = -1 },
+        new() { Row = 0, Col = 1 },
+        new() { Row = -1, Col = -1 },
+        new() { Row = -1, Col = 1 },
+        new() { Row = 1, Col = -1 },
+        new() { Row = 1, Col = 1 }
     };
 
     /// <summary>
@@ -56,11 +56,11 @@ public class GameManager
     /// </summary>
     public event Action<GameResult>? GameOver;
 
-    public GameManager(IPlayer player1, IPlayer player2)
+    public GameManager(IPlayer player1, IPlayer player2, IBoard board, IPiece blackPiece, IPiece whitePiece)
     {
-        Board = new Board();
-        _blackPiece = new Piece { Color = PieceColor.Black };
-        _whitePiece = new Piece { Color = PieceColor.White };
+        Board = board;
+        _blackPiece = blackPiece;
+        _whitePiece = whitePiece;
 
         // Randomize player colors
         var rng = new Random();
@@ -81,25 +81,13 @@ public class GameManager
         PlaceInitialPieces();
     }
 
-    public GameManager(IPlayer blackPlayer, IPlayer whitePlayer, IBoard board, IPiece blackPiece, IPiece whitePiece)
-    {
-        _blackPlayer = blackPlayer;
-        _whitePlayer = whitePlayer;
-        _blackPlayer.Color = PieceColor.Black;
-        _whitePlayer.Color = PieceColor.White;
-        Board = board;
-        _blackPiece = blackPiece;
-        _whitePiece = whitePiece;
-        CurrentTurn = PieceColor.Black;
-        PlaceInitialPieces();
-    }
-
     public bool IsGameOver()
     {
         var whiteCanMove = HasValidMove(PieceColor.White);
         var blackCanMove = HasValidMove(PieceColor.Black);
+        bool isGameOver = !whiteCanMove && !blackCanMove;
 
-        return !(whiteCanMove || blackCanMove);
+        return isGameOver;
     }
 
     public MoveResult Start()
@@ -114,8 +102,8 @@ public class GameManager
             };
         }
 
-        CurrentTurn = PieceColor.Black;
         _isStarted = true;
+        CurrentTurn = PieceColor.Black;
 
         GameStarted?.Invoke();
         ScoreChanged?.Invoke(GetScore());
@@ -214,7 +202,7 @@ public class GameManager
             MovePlayed?.Invoke(move);
             ScoreChanged?.Invoke(GetScore());
 
-            List<Move> moves = new List<Move> { move };
+            List<Move> moves = [move];
 
             AdvanceTurn();
             PlayAutoTurns(moves);
@@ -232,15 +220,14 @@ public class GameManager
         }
     }
 
-    public IReadOnlyList<Position>? GetValidMoves()
+    public IReadOnlyList<Position> GetValidMoves()
     {
         return FindValidMoves(CurrentTurn).Select(m => m.Target).ToList();
     }
 
     public Score GetScore()
     {
-        int blackScore = 0;
-        int whiteScore = 0;
+        Score score = new Score();
 
         foreach (var cell in Board.Cells)
         {
@@ -251,19 +238,15 @@ public class GameManager
 
             if (cell.Piece.Color == PieceColor.Black)
             {
-                blackScore++;
+                score.Black++;
             }
             else
             {
-                whiteScore++;
+                score.White++;
             }
         }
 
-        return new Score
-        {
-            Black = blackScore,
-            White = whiteScore
-        };
+        return score;
     }
 
     public IPlayer GetPlayer(PieceColor color) => color == PieceColor.Black ? _blackPlayer : _whitePlayer;
@@ -279,12 +262,12 @@ public class GameManager
         };
 
         IPiece[] pieces =
-        {
+        [
             GetPiece(PieceColor.White),
             GetPiece(PieceColor.White),
             GetPiece(PieceColor.Black),
             GetPiece(PieceColor.Black)
-        };
+        ];
 
         for (int i = 0; i < pieces.Length; i++)
         {
@@ -310,9 +293,10 @@ public class GameManager
             }
 
             var choice = auto.ChooseMove(candidates);
-            if (choice == null || !candidates.Any(c => c.Target.Row == choice.Target.Row && c.Target.Col == choice.Target.Col))
+            if (choice == null ||
+                !candidates.Any(c => c.Target.Row == choice.Target.Row && c.Target.Col == choice.Target.Col))
             {
-                throw new InvalidOperationException($"Auto player {((IPlayer)auto).Name} returned an invalid move.");
+                throw new InvalidOperationException($"Auto player {auto.Name} returned an invalid move.");
             }
 
             var move = ApplyMove(choice.Target, CurrentTurn);
@@ -363,10 +347,10 @@ public class GameManager
             TurnChanged?.Invoke(CurrentTurn);
         }
 
-        TryGetResult(out var result);
+        bool isGameOver = TryGetResult(out var result);
         Result = result;
 
-        if (result != null)
+        if (isGameOver && result != null)
         {
             GameOver?.Invoke(result.Value);
         }
@@ -384,7 +368,7 @@ public class GameManager
             }
 
             var flips = GetFlips(cell.Position, color);
-            if (flips != null && flips.Count > 0)
+            if (flips is { Count: > 0 })
             {
                 validMoves.Add(new Move
                 {
@@ -409,11 +393,11 @@ public class GameManager
         PieceColor opponentColor = (color == PieceColor.Black) ? PieceColor.White : PieceColor.Black;
         List<Position> totalFlips = new List<Position>();
 
-        foreach (var dir in _directions)
+        foreach (var dir in Directions)
         {
             List<Position> potentialFlips = new List<Position>();
-            int currRow = position.Row + dir.DRow;
-            int currCol = position.Col + dir.DCol;
+            int currRow = position.Row + dir.Row;
+            int currCol = position.Col + dir.Col;
 
             while (true)
             {
@@ -428,8 +412,8 @@ public class GameManager
                 if (cell.Piece.Color == opponentColor)
                 {
                     potentialFlips.Add(nextPos);
-                    currRow += dir.DRow;
-                    currCol += dir.DCol;
+                    currRow += dir.Row;
+                    currCol += dir.Col;
                     continue;
                 }
 
@@ -471,9 +455,15 @@ public class GameManager
                 return true;
             }
         }
+
         return false;
     }
 
+    /// <summary>
+    /// Try to get the result if the game is over or not
+    /// </summary>
+    /// <param name="result">Result of the game <see cref="GameResult"/></param>
+    /// <returns></returns>
     private bool TryGetResult(out GameResult? result)
     {
         if (!IsGameOver())
@@ -490,8 +480,5 @@ public class GameManager
         return true;
     }
 
-    private bool IsInside(Position position)
-    {
-        return position.Col >= 0 && position.Col <= 7 && position.Row >= 0 && position.Row <= 7;
-    }
+    private bool IsInside(Position position) => position.Col is >= 0 and <= 7 && position.Row is >= 0 and <= 7;
 }

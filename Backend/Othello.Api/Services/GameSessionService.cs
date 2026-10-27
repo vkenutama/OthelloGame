@@ -4,40 +4,8 @@ using Othello.Domain;
 
 namespace Othello.Api.Services;
 
-public class GameSessionService
+public static class GameSessionService
 {
-    private readonly ConcurrentDictionary<string, GameManager> _activeGames = new();
-
-    public GameManager CreateGame(string gameId, string player1Name = "Player 1", string player2Name = "Player 2")
-    {
-        var player1 = new HumanPlayer
-        {
-            Name = player1Name
-        };
-
-        var player2 = new HumanPlayer
-        {
-            Name = player2Name
-        };
-
-        var game = new GameManager(player1, player2);
-        _activeGames[gameId] = game;
-
-        game.Start();
-        return game;
-    }
-
-    public GameManager? GetGame(string gameId)
-    {
-        _activeGames.TryGetValue(gameId, out GameManager? game);
-        return game;
-    }
-
-    public bool RemoveGame(string gameId)
-    {
-        return _activeGames.TryRemove(gameId, out _);
-    }
-
     public static GameStateDto ToStateDto(string gameId, GameManager game)
     {
         var boardArray = new string?[8][];
@@ -58,7 +26,7 @@ public class GameSessionService
             }
         }
 
-        var validMoves = game.GetValidMoves() ?? new List<Position>();
+        var validMoves = game.GetValidMoves();
         var validMoveDtos = validMoves
             .Select(p => new PositionDto(p.Row, p.Col))
             .ToList();
