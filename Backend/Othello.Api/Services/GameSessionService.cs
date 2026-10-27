@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Othello.Api.Dtos;
 using Othello.Domain;
 
