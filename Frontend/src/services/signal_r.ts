@@ -7,7 +7,8 @@ import {
     JoinLobbyDto,
     StartGameDto,
     MakeMoveDto,
-    PlayerColor
+    PlayerColor,
+    OpponentDisconnectionInfo
 } from "../types/othello"
 import { useEffect, useState } from 'react'
 import { getLobby, getLobbyByPlayerUsername } from './api'
@@ -26,6 +27,8 @@ export function useOthelloSignalR() {
     const [messages, setMessages] = useState<string[]>([]);
     const [chatMessages, setChatMessages] = useState<ChatMessageItem[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [onlinePlayerCount, setOnlinePlayerCount] = useState<number>(0);
+    const [opponentDisconnection, setOpponentDisconnection] = useState<OpponentDisconnectionInfo | null>(null);
 
     useEffect(() => {
         let isMounted = true;
@@ -47,6 +50,7 @@ export function useOthelloSignalR() {
             if (isMounted) {
                 setIsConnected(true);
                 setError(null);
+                newConnection.invoke("GetOnlinePlayersCount").catch(() => {});
             }
         })
 
@@ -75,6 +79,7 @@ export function useOthelloSignalR() {
 
         newConnection.on("GameOver", (result: string, blackScore: number, whiteScore: number) => {
             setGameOverResult(result);
+            setOpponentDisconnection(null);
             setMessages((prev) =>
                 [
                     ...prev,
@@ -92,8 +97,25 @@ export function useOthelloSignalR() {
         });
 
         newConnection.on("LobbyDeleted", (msg: string) => {
+            setOpponentDisconnection(null);
             setMessages((prev) => [...prev, msg]);
         });
+
+        newConnection.on("OpponentDisconnected", (playerName: string, timeoutSeconds: number) => {
+            setOpponentDisconnection({
+                playerName,
+                timeoutSeconds: timeoutSeconds || 30,
+                startTime: Date.now()
+            });
+        });
+
+        newConnection.on("OpponentReconnected", (_playerName: string) => {
+            setOpponentDisconnection(null);
+        });
+
+        newConnection.on("OnlinePlayersCountChanged", (onlinePlayerCount: number) => {
+            setOnlinePlayerCount(onlinePlayerCount)
+        })
 
         newConnection.on("ReceiveChat", (raw: ReceiveChatDto) => {
             if (!isMounted) return;
@@ -146,6 +168,9 @@ export function useOthelloSignalR() {
                         console.log("Connected to SignalR Hub")
                         setIsConnected(true);
                         setError(null);
+                        newConnection.invoke("GetOnlinePlayersCount").catch((err) => {
+                            console.warn("Could not fetch online players count", err);
+                        });
                     } else {
                         void newConnection.stop();
                     }
@@ -184,10 +209,12 @@ export function useOthelloSignalR() {
             newConnection.off("ErrorMessage");
             newConnection.off("ReceiveBroadcast");
             newConnection.off("LobbyDeleted");
+            newConnection.off("OpponentDisconnected");
+            newConnection.off("OpponentReconnected");
             newConnection.off("ReceiveChat");
 
             if (newConnection.state !== signalR.HubConnectionState.Disconnected) {
-                newConnection.stop().catch(() => {});
+                newConnection.stop().catch(() => { });
             }
         };
     }, []);
@@ -321,8 +348,11 @@ export function useOthelloSignalR() {
     // 3. Leave a lobby
     const leaveLobby = async (lobbyId: number, playerName: string) => {
         if (!connection) return;
+        setGameState(null);
         setLastMove(null);
         setGameOverResult(null);
+        setOpponentDisconnection(null);
+        setMessages([]);
         await connection.invoke("LeaveLobby", {
             lobbyId,
             playerUsername: playerName
@@ -332,8 +362,10 @@ export function useOthelloSignalR() {
     // 4. Start the game
     const startGame = async (lobbyId: number, playerName: string) => {
         if (!connection) return;
+        setGameState(null);
         setLastMove(null);
         setGameOverResult(null);
+        setOpponentDisconnection(null);
         setMessages([]);
         const dto: StartGameDto = {
             lobbyId,
@@ -389,6 +421,16 @@ export function useOthelloSignalR() {
         }
     };
 
+    const getOnlinePlayersCount = async () => {
+        if (connection && connection.state === signalR.HubConnectionState.Connected) {
+            try {
+                await connection.invoke("GetOnlinePlayersCount");
+            } catch (err) {
+                console.warn("Failed to get online players count:", err);
+            }
+        }
+    };
+
     return {
         isConnected,
         gameState,
@@ -397,12 +439,22 @@ export function useOthelloSignalR() {
         messages,
         chatMessages,
         error,
+        onlinePlayerCount,
+        opponentDisconnection,
         clearError: () => setError(null),
+        clearGameState: () => {
+            setGameState(null);
+            setLastMove(null);
+            setGameOverResult(null);
+            setOpponentDisconnection(null);
+            setMessages([]);
+        },
         createLobby,
         joinLobby,
         leaveLobby,
         startGame,
         makeMove,
-        postChat
+        postChat,
+        getOnlinePlayersCount
     }
 }

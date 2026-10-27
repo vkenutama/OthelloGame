@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { GameStateDto, MoveResultDto, PlayerColor } from "../../types/othello";
+import { useState, useEffect, useRef } from "react";
+import { GameStateDto, MoveResultDto, PlayerColor, OpponentDisconnectionInfo } from "../../types/othello";
 
 interface MatchViewProps {
   gameState: GameStateDto;
@@ -8,6 +8,7 @@ interface MatchViewProps {
   messages: string[];
   lastMove?: MoveResultDto | null;
   gameOverResult?: string | null;
+  opponentDisconnection?: OpponentDisconnectionInfo | null;
   onMakeMove: (row: number, col: number) => Promise<void>;
   onLeaveMatch: () => void;
 }
@@ -18,12 +19,40 @@ export function MatchView({
   messages,
   lastMove,
   gameOverResult,
+  opponentDisconnection,
   onMakeMove,
   onLeaveMatch,
 }: MatchViewProps) {
   const [isSubmittingMove, setIsSubmittingMove] = useState(false);
   const [hoveredMove, setHoveredMove] = useState<{ row: number; col: number } | null>(null);
   const [showConfirmLeave, setShowConfirmLeave] = useState(false);
+
+  // Opponent Disconnection 30s Countdown State
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(30);
+  const [showReconnectedToast, setShowReconnectedToast] = useState(false);
+  const prevDisconnectionRef = useRef<OpponentDisconnectionInfo | null>(null);
+
+  useEffect(() => {
+    if (opponentDisconnection) {
+      prevDisconnectionRef.current = opponentDisconnection;
+      const updateCountdown = () => {
+        const elapsed = (Date.now() - opponentDisconnection.startTime) / 1000;
+        const rem = Math.max(0, opponentDisconnection.timeoutSeconds - elapsed);
+        setRemainingSeconds(rem);
+      };
+
+      updateCountdown();
+      const interval = setInterval(updateCountdown, 100);
+      return () => clearInterval(interval);
+    } else {
+      if (prevDisconnectionRef.current && !gameState.isGameOver) {
+        setShowReconnectedToast(true);
+        const timer = setTimeout(() => setShowReconnectedToast(false), 4000);
+        prevDisconnectionRef.current = null;
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [opponentDisconnection, gameState.isGameOver]);
 
   // Detect if game concluded due to forfeit / player leaving
   // ONLY true if explicit forfeit occurred in THIS game session
@@ -511,6 +540,92 @@ export function MatchView({
           </div>
         );
       })()}
+
+      {/* Disconnection Reconnected Toast */}
+      {showReconnectedToast && (
+        <aside
+          aria-label="Opponent reconnected toast"
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl border border-emerald-500/50 bg-slate-900/95 px-5 py-3 text-sm text-emerald-300 shadow-2xl shadow-black/80 backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-300 ring-1 ring-emerald-500/30"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-base shadow-sm">
+            🎉
+          </span>
+          <div>
+            <p className="font-bold text-white text-xs">Opponent Reconnected!</p>
+            <p className="text-[11px] text-slate-300 mt-0.5">
+              <strong className="text-emerald-400">{opponentName}</strong> rejoined the game. Resuming match!
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowReconnectedToast(false)}
+            className="ml-2 flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
+            title="Dismiss"
+          >
+            ✕
+          </button>
+        </aside>
+      )}
+
+      {/* Disconnection 30s Countdown Modal */}
+      {opponentDisconnection && !gameState.isGameOver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/40 bg-slate-900/95 p-7 text-center shadow-2xl shadow-amber-950/60 ring-1 ring-amber-500/30">
+            {/* Glow Accent */}
+            <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-44 w-72 rounded-full blur-3xl bg-amber-500/20 pointer-events-none" />
+
+            {/* Warning Icon with Radar Pulse */}
+            <div className="relative mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-500/10 border border-amber-500/30 text-3xl shadow-lg">
+              <span className="absolute -inset-1 rounded-3xl border border-amber-400/40 animate-ping opacity-30 pointer-events-none" />
+              <span>⚠️</span>
+            </div>
+
+            <h2 className="text-2xl font-black text-white tracking-tight">
+              Opponent Disconnected
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-300">
+              Player <span className="font-bold text-amber-400">{opponentDisconnection.playerName}</span> lost connection.
+            </p>
+            <p className="mt-1 text-xs text-slate-400 flex items-center justify-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+              Waiting for them to rejoin the match...
+            </p>
+
+            {/* Countdown Timer Display */}
+            <div className="my-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <div className="text-4xl font-extrabold text-amber-300 font-mono tracking-tight">
+                {Math.ceil(remainingSeconds)}s
+              </div>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-1 block">
+                Time Remaining
+              </span>
+
+              {/* Progress Bar */}
+              <div className="mt-3 w-full rounded-full bg-slate-800/80 p-1 border border-slate-700/60 overflow-hidden">
+                <div
+                  className={`h-2.5 rounded-full transition-all duration-100 ease-linear ${
+                    Math.ceil(remainingSeconds) <= 10
+                      ? "bg-gradient-to-r from-rose-500 to-amber-500 shadow-md shadow-rose-500/50"
+                      : "bg-gradient-to-r from-amber-500 to-emerald-500 shadow-md shadow-amber-500/30"
+                  }`}
+                  style={{
+                    width: `${Math.min(100, Math.max(0, (remainingSeconds / (opponentDisconnection.timeoutSeconds || 30)) * 100))}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Forfeit explanation info pill */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3.5 text-xs text-slate-300 text-left flex items-start gap-2.5">
+              <span className="text-base text-amber-400 shrink-0 mt-0.5">ℹ️</span>
+              <span className="leading-relaxed text-slate-300">
+                If <strong className="text-amber-300">{opponentDisconnection.playerName}</strong> does not rejoin within 30 seconds, you will <strong className="text-emerald-400">win by forfeit</strong> and the lobby will be disbanded.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 4. Game Over Celebration Modal */}
       {gameState.isGameOver && (

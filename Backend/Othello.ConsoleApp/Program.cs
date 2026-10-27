@@ -24,7 +24,17 @@ class Program
 
         var player1 = new HumanPlayer { Name = "Player 1" };
         var player2 = new GreedyAIPlayer();
-        var game = new GameManager(player1, player2);
+        Board board = new Board();
+        Piece blackPiece = new Piece
+        {
+            Color = PieceColor.Black
+        };
+
+        Piece whitePiece = new Piece
+        {
+            Color = PieceColor.White
+        };
+        GameManager game = new GameManager(player1, player2, board, blackPiece, whitePiece);
 
         var eventLogs = new List<string>();
 
@@ -42,13 +52,15 @@ class Program
         {
             var blackPlayer = game.GetPlayer(PieceColor.Black);
             var whitePlayer = game.GetPlayer(PieceColor.White);
-            LogEvent($"[green]Game started![/] Black: [cyan]{blackPlayer.Name}[/], White: [white]{whitePlayer.Name}[/]");
+            LogEvent(
+                $"[green]Game started![/] Black: [cyan]{blackPlayer.Name}[/], White: [white]{whitePlayer.Name}[/]");
         };
 
         game.MovePlayed += move =>
         {
             var colorMarkup = move.Color == PieceColor.Black ? "[cyan]Black[/]" : "[white]White[/]";
-            LogEvent($"{colorMarkup} played at [yellow]({move.Target.Row}, {move.Target.Col})[/], flipped [green]{move.Flipped.Count}[/] piece(s).");
+            LogEvent(
+                $"{colorMarkup} played at [yellow]({move.Target.Row}, {move.Target.Col})[/], flipped [green]{move.Flipped.Count}[/] piece(s).");
         };
 
         game.TurnSkipped += color =>
@@ -68,10 +80,7 @@ class Program
             LogEvent($"Score update: [cyan]B: {score.Black}[/] | [white]W: {score.White}[/]");
         };
 
-        game.GameOver += result =>
-        {
-            LogEvent($"[bold green]GAME OVER![/] Winner: [yellow]{result}[/]");
-        };
+        game.GameOver += result => { LogEvent($"[bold green]GAME OVER![/] Winner: [yellow]{result}[/]"); };
 
         // Start game
         var startResult = game.Start();
@@ -89,12 +98,14 @@ class Program
             var validMoves = game.GetValidMoves() ?? new List<Position>();
             if (validMoves.Count == 0)
             {
-                AnsiConsole.MarkupLine("[yellow]No valid moves available for current player. Press Enter to proceed...[/]");
+                AnsiConsole.MarkupLine(
+                    "[yellow]No valid moves available for current player. Press Enter to proceed...[/]");
                 Console.ReadLine();
                 continue;
             }
 
-            var input = ReadInput("[green]Enter move[/] as [yellow]<row> <col>[/] (e.g. [yellow]2 3[/]) or [red]'quit'[/]:");
+            var input = ReadInput(
+                "[green]Enter move[/] as [yellow]<row> <col>[/] (e.g. [yellow]2 3[/]) or [red]'quit'[/]:");
 
             if (string.Equals(input, "quit", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(input, "exit", StringComparison.OrdinalIgnoreCase))
@@ -134,7 +145,8 @@ class Program
         };
 
         AnsiConsole.Write(new Panel(
-            new Markup($"[bold]Final Score:[/] [cyan]Black: {finalScore.Black}[/] | [white]White: {finalScore.White}[/]\n\nResult: {winnerText}"))
+                new Markup(
+                    $"[bold]Final Score:[/] [cyan]Black: {finalScore.Black}[/] | [white]White: {finalScore.White}[/]\n\nResult: {winnerText}"))
             .Header("[bold yellow]Game Summary[/]")
             .Border(BoxBorder.Double)
             .BorderColor(Color.Yellow)

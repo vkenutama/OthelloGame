@@ -22,7 +22,7 @@ export function LobbyRoom({
   const [isStarting, setIsStarting] = useState(false);
 
   // Check if current user is the host
-  const isHost = lobby.createdBy.toLowerCase() === currentPlayerName.toLowerCase();
+  const isHost = (lobby.createdBy || "").toLowerCase() === (currentPlayerName || "").toLowerCase();
 
   // Host player is always lobby.createdBy
   const hostPlayerName = lobby.createdBy;

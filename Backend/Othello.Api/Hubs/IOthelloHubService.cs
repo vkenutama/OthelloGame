@@ -10,4 +10,5 @@ public interface IOthelloHubService
     Task JoinLobby(JoinLobbyDto dto);
     Task GetMyLobby(string username);
     Task PostChat(SendChatDto dto);
+    Task GetOnlinePlayersCount();
 }

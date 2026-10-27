@@ -6,4 +6,5 @@ export interface GetLobbyDetailsDto {
     maxPlayers: number;
     hasPassword?: boolean;
     isPublic?: boolean;
+    players?: { name: string }[];
 }

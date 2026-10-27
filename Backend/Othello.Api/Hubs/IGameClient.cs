@@ -1,4 +1,4 @@
-﻿using Othello.Api.Dtos;
+using Othello.Api.Dtos;
 
 namespace Othello.Api.Hubs;
 
@@ -12,4 +12,7 @@ public interface IGameClient
     Task ReceiveBroadcast(string message);
     Task LobbyDeleted(string message);
     Task ReceiveChat(ReceiveChatDto chat);
+    Task OnlinePlayersCountChanged(int onlinePlayerCount);
+    Task OpponentDisconnected(string playerName, int timeoutSeconds);
+    Task OpponentReconnected(string playerName);
 }

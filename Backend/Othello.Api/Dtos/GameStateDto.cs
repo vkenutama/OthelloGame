@@ -5,7 +5,7 @@ public record PositionDto(int Row, int Col);
 public record GameStateDto
 {
     public required string GameId { get; init; }
-    public required string?[][] Board { get; init; } // 8x8 jagged array: board[row][col]
+    public required string?[][] Board { get; init; } // 8x8
     public required string CurrentTurn { get; init; } // "Black" or "White"
     public required string BlackPlayerName { get; init; }
     public required string WhitePlayerName { get; init; }

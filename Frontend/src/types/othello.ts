@@ -74,6 +74,12 @@ export interface ActiveLobbyInfo {
   guestName?: string | null;
 }
 
+export interface OpponentDisconnectionInfo {
+  playerName: string;
+  timeoutSeconds: number;
+  startTime: number;
+}
+
 // --- Chat Lobby Invite Payload ---
 
 export interface LobbyInvitePayload {

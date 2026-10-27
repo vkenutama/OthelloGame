@@ -10,7 +10,7 @@ import { CreateLobbyModal } from "./components/lobby/CreateLobbyModal";
 import { LobbyRoom } from "./components/lobby/LobbyRoom";
 import { MatchView } from "./components/game/MatchView";
 import { BackgroundEffects } from "./components/BackgroundEffects";
-import { getLobby, getLobbyById } from "./services/api"
+import { getLobby, getLobbyById, getLobbyByPlayerUsername } from "./services/api"
 import { ChatSidebar } from "./components/chat/ChatSidebar";
 import { ChallengeNotificationPopup } from "./components/notifications/ChallengeNotificationPopup";
 import { LobbyAlertPopup, LobbyAlertInfo } from "./components/notifications/LobbyAlertPopup";
@@ -25,12 +25,16 @@ function App() {
     gameOverResult,
     messages,
     chatMessages,
+    onlinePlayerCount,
+    opponentDisconnection,
+    clearGameState,
     createLobby,
     joinLobby,
     leaveLobby,
     startGame,
     makeMove,
-    postChat
+    postChat,
+    getOnlinePlayersCount
   } = useOthelloSignalR();
 
   const [lobbies, setLobbies] = useState<GetLobbyDetailsDto[] | null>(null);
@@ -125,9 +129,52 @@ function App() {
     }
   }, [viewMode, refreshLobbies]);
 
-  // If a game state arrives while in lobby waiting room or AI mode, transition automatically to in_game
+  // Auto-reconnect if player had an active lobby or ongoing match session before reload/reconnect
   useEffect(() => {
-    if (gameState && !gameState.isGameOver && (viewMode === "lobby" || viewMode === "ai")) {
+    if (!isConnected || !playerName) return;
+
+    let isSubscribed = true;
+    const checkActiveGameSession = async () => {
+      try {
+        const active = await getLobbyByPlayerUsername(playerName);
+        if (!isSubscribed || !active) return;
+
+        // Only auto-reconnect to human lobbies, not singleplayer AI games
+        const isAi = (active.name && active.name.includes("vs AI")) || active.createdBy === "Greedy AI";
+        if (isAi) return;
+
+        if (!currentLobby || currentLobby.id !== active.id) {
+          await joinLobby(active.id, playerName);
+          const details = await getLobbyById(active.id);
+          if (!isSubscribed) return;
+
+          const isHost = active.createdBy?.toLowerCase() === playerName.toLowerCase();
+          const otherPlayer = details?.players?.find(p => p.name.toLowerCase() !== playerName.toLowerCase());
+
+          setCurrentLobby({
+            id: active.id,
+            name: active.name,
+            createdBy: active.createdBy,
+            playersCount: active.playersCount,
+            guestName: isHost ? otherPlayer?.name : active.createdBy,
+          });
+
+          setViewMode((prev) => (prev === "in_game" ? "in_game" : "lobby"));
+        }
+      } catch {
+        // Not in an active session, continue normally
+      }
+    };
+
+    checkActiveGameSession();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [isConnected, playerName]);
+
+  // If a game state arrives while in multiplayer lobby waiting room, transition automatically to in_game
+  useEffect(() => {
+    if (gameState && !gameState.isGameOver && viewMode === "lobby") {
       setViewMode("in_game");
     }
   }, [gameState, viewMode]);
@@ -238,10 +285,20 @@ function App() {
   // 2. Handle Joining a Lobby
   const handleJoinLobby = async (lobby: GetLobbyDetailsDto, password?: string) => {
     try {
+      // If currently in another lobby, leave it first
+      if (currentLobby && currentLobby.id !== lobby.id) {
+        try {
+          await leaveLobby(currentLobby.id, playerName);
+        } catch (err) {
+          console.warn("Could not leave previous lobby", err);
+        }
+        setCurrentLobby(null);
+      }
+
       // Pre-check if lobby exists and is open
       const latestLobby = await getLobbyById(lobby.id);
       if (!latestLobby) {
-        throw new Error(`Lobby "${lobby.name}" (#${lobby.id}) does not exist or has already been closed.`);
+        throw new Error(`Lobby "${lobby.name || `Room #${lobby.id}`}" (#${lobby.id}) does not exist or has already been closed.`);
       }
 
       if (latestLobby.playersCount >= 2) {
@@ -273,7 +330,7 @@ function App() {
         id: lobby.id,
         title: isNotExist ? "Lobby Does Not Exist" : "Unable to Join Room",
         message: isNotExist
-          ? `Lobby "${lobby.name}" (#${lobby.id}) does not exist or has already been closed by the host.`
+          ? `Lobby "${lobby.name || `Room #${lobby.id}`}" (#${lobby.id}) does not exist or has already been closed by the host.`
           : errorMsg,
         type: "error",
       });
@@ -286,6 +343,16 @@ function App() {
   // 2b. Handle Joining by Lobby ID
   const handleJoinById = async (lobbyId: number, password?: string) => {
     try {
+      // If currently in another lobby, leave it first
+      if (currentLobby && currentLobby.id !== lobbyId) {
+        try {
+          await leaveLobby(currentLobby.id, playerName);
+        } catch (err) {
+          console.warn("Could not leave previous lobby", err);
+        }
+        setCurrentLobby(null);
+      }
+
       const lobby = await getLobbyById(lobbyId);
       if (!lobby) {
         throw new Error(`Lobby #${lobbyId} does not exist or has already been closed.`);
@@ -437,20 +504,23 @@ function App() {
     if (isStartingAi) return;
     try {
       setIsStartingAi(true);
+      clearGameState();
 
       // Clean up previous lobby if any
-      if (currentLobby) {
+      const prevLobbyId = currentLobby?.id || (gameState ? parseInt(gameState.gameId, 10) : 0);
+      if (prevLobbyId) {
         try {
-          await leaveLobby(currentLobby.id, playerName);
+          await leaveLobby(prevLobbyId, playerName);
         } catch (e) {
           console.warn("Could not leave previous lobby", e);
         }
+        setCurrentLobby(null);
       }
 
-      // Create AI Lobby
+      // Create fresh AI Lobby
       const lobbyName = `vs AI (${playerName})`;
       const lobby = await createLobby(lobbyName, false, playerName, true);
-      
+
       if (lobby && typeof lobby.id === "number") {
         setCurrentLobby({
           id: lobby.id,
@@ -461,7 +531,7 @@ function App() {
           guestName: "Greedy AI",
         });
 
-        // Start match and enter game view
+        // Start match fresh and enter game view
         await handleStartGame(lobby.id);
         setViewMode("in_game");
       }
@@ -481,20 +551,43 @@ function App() {
   // 6. Handle Leaving Match
   const handleLeaveMatch = async () => {
     const isAi = currentLobby?.guestName === "Greedy AI" || gameState?.whitePlayerName === "Greedy AI" || gameState?.blackPlayerName === "Greedy AI";
-    if (currentLobby) {
-      await leaveLobby(currentLobby.id, playerName);
+    const lobbyId = currentLobby?.id || (gameState ? parseInt(gameState.gameId, 10) : 0);
+    clearGameState();
+    if (lobbyId) {
+      try {
+        await leaveLobby(lobbyId, playerName);
+      } catch (err) {
+        console.warn("Could not leave lobby", err);
+      }
       setCurrentLobby(null);
     }
     setViewMode(isAi ? "menu" : "online");
     refreshLobbies();
   };
 
-  // 5. Handle Mode Selection from Main Menu
+  // 7. Handle Mode Selection from Main Menu
   const handleSelectMode = (mode: "ai" | "online") => {
+    if (mode === "ai") {
+      clearGameState();
+      setCurrentLobby(null);
+    }
     setViewMode(mode);
     if (mode === "online") {
       refreshLobbies();
     }
+  };
+
+  // 8. Handle Navbar Home Click (safely leave active sessions)
+  const handleNavbarHome = async () => {
+    if (viewMode === "in_game") {
+      await handleLeaveMatch();
+    } else if (viewMode === "lobby") {
+      await handleLeaveLobby();
+    } else if (viewMode === "ai") {
+      clearGameState();
+      setCurrentLobby(null);
+    }
+    setViewMode("menu");
   };
 
   return (
@@ -508,7 +601,7 @@ function App() {
         isConnected={isConnected}
         playerName={playerName}
         onPlayerNameChange={handleNameChange}
-        toHomeScreen={setViewMode}
+        toHomeScreen={handleNavbarHome}
         currentScreen={viewMode}
       />
 
@@ -517,7 +610,7 @@ function App() {
         {viewMode === "menu" && (
           <ModeSelection
             onSelectMode={handleSelectMode}
-            onlinePlayerCount={lobbies?.reduce((acc, l) => acc + l.playersCount, 0)}
+            onlinePlayerCount={onlinePlayerCount || (lobbies ? lobbies.reduce((acc, l) => acc + l.playersCount, 0) : 0)}
           />
         )}
 
@@ -635,6 +728,7 @@ function App() {
               messages={messages}
               lastMove={lastMove}
               gameOverResult={gameOverResult}
+              opponentDisconnection={opponentDisconnection}
               onMakeMove={handleMakeMove}
               onLeaveMatch={handleLeaveMatch}
             />
@@ -700,6 +794,8 @@ function App() {
       />
 
       <ChatSidebar
+        getOnlinePlayersCount={getOnlinePlayersCount}
+        onlinePlayersCount={onlinePlayerCount}
         playerName={playerName}
         currentScreen={viewMode}
         messages={chatMessages}
@@ -717,7 +813,8 @@ function App() {
         onSendMessage={async (msg, channel) => {
           const activeLobbyId = currentLobby?.id ?? (gameState ? parseInt(gameState.gameId, 10) || null : null);
           await postChat(playerName, msg, channel === "lobby", activeLobbyId);
-        }}
+        }
+        }
       />
     </div>
   );
